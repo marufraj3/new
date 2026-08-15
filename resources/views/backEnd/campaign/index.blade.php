@@ -65,8 +65,11 @@
     .action-btn:hover { background-color: #eef2f7; color: #343a40; }
     
     .btn-view:hover { background-color: rgba(10, 207, 151, 0.1); color: #0acf97; }
+    .btn-builder { color: #7c3aed; background: rgba(124, 58, 237, 0.08); }
+    .btn-builder:hover { color: #fff; background: #7c3aed; box-shadow: 0 7px 16px rgba(124, 58, 237, .24); }
     .btn-edit:hover { background-color: rgba(114, 124, 245, 0.1); color: #727cf5; }
     .btn-delete:hover { background-color: rgba(250, 92, 124, 0.1); color: #fa5c7c; }
+    .builder-status { display: inline-flex; width: fit-content; margin-top: 5px; padding: 3px 8px; border-radius: 999px; color: #6d28d9; background: #f3e8ff; font-size: 10px; font-weight: 700; }
 </style>
 @endsection
 
@@ -108,6 +111,9 @@
                                         <a href="{{url('campaign',$value->slug)}}" target="_blank" class="campaign-link">
                                             <i class="fe-external-link me-1"></i> {{url('campaign',$value->slug)}}
                                         </a>
+                                        @if(!empty($value->page_html))
+                                            <span class="builder-status"><i class="fe-layout me-1"></i> Visual design active</span>
+                                        @endif
                                     </div>
                                 </td>
 
@@ -119,8 +125,13 @@
                                             <i class="fe-eye"></i>
                                         </a>
 
-                                        {{-- Edit --}}
-                                        <a href="{{route('campaign.edit',$value->id)}}" class="action-btn btn-edit" title="Edit">
+                                        {{-- Elementor-style visual builder --}}
+                                        <a href="{{ route('campaign.builder', $value->id) }}" class="action-btn btn-builder" title="Open Visual Builder">
+                                            <i class="fe-layout"></i>
+                                        </a>
+
+                                        {{-- Edit campaign settings and products --}}
+                                        <a href="{{route('campaign.edit',$value->id)}}" class="action-btn btn-edit" title="Edit Campaign Settings">
                                             <i class="fe-edit"></i>
                                         </a>
 

@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Frontend;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\Productprice;
+use App\Models\ProductVariantPrice;
 use App\Models\Product;
+use App\Models\Size;
+use App\Models\Color;
 use App\Models\Coupon;
 use Toastr;
 use Cart;
@@ -205,48 +207,41 @@ class ShoppingController extends Controller
             return redirect()->back();
         }
 
-        $price = 0;
+        $variant = null;
+        $variantMatrix = ProductVariantPrice::where('product_id', $product->id);
+        if ((clone $variantMatrix)->exists()) {
+            $requiresSize = (clone $variantMatrix)->whereNotNull('size_id')->exists();
+            $requiresColor = (clone $variantMatrix)->whereNotNull('color_id')->exists();
 
-// color + size
-if ($request->filled('product_color') && $request->filled('product_size')) {
-    $variant = Productprice::where('product_id', $product->id)
-        ->where('color', $request->product_color)
-        ->where('size', $request->product_size)
-        ->first();
+            if (($requiresSize && !$request->filled('product_size')) || ($requiresColor && !$request->filled('product_color'))) {
+                Toastr::error('Please select the required size and color.', 'Error!');
+                return redirect()->back()->withInput();
+            }
 
-    if ($variant) {
-        $price = (float) $variant->price;
-    }
-}
+            $variant = (clone $variantMatrix)
+                ->when($requiresColor, fn ($query) => $query->where('color_id', $request->product_color))
+                ->when($requiresSize, fn ($query) => $query->where('size_id', $request->product_size))
+                ->first();
 
-// only color
-elseif ($request->filled('product_color')) {
-    $variant = Productprice::where('product_id', $product->id)
-        ->where('color', $request->product_color)
-        ->whereNull('size')
-        ->first();
+            if (!$variant) {
+                Toastr::error('The selected product variant is not available.', 'Error!');
+                return redirect()->back()->withInput();
+            }
 
-    if ($variant) {
-        $price = (float) $variant->price;
-    }
-}
+            if ($variant->stock !== null && (int) $variant->stock < max(1, (int) ($request->qty ?? 1))) {
+                Toastr::error('The selected product variant is out of stock.', 'Error!');
+                return redirect()->back()->withInput();
+            }
+        }
 
-// only size
-elseif ($request->filled('product_size')) {
-    $variant = Productprice::where('product_id', $product->id)
-        ->where('size', $request->product_size)
-        ->whereNull('color')
-        ->first();
+        $price = $variant && $variant->price > 0
+            ? (float) $variant->price
+            : (float) ($product->new_price ?? $product->old_price ?? 1);
 
-    if ($variant) {
-        $price = (float) $variant->price;
-    }
-}
-
-// fallback
-if ($price <= 0) {
-    $price = (float) ($product->new_price ?? $product->old_price ?? 1);
-}
+        $size = $request->filled('product_size') ? Size::find($request->product_size) : null;
+        $color = $request->filled('product_color') ? Color::find($request->product_color) : null;
+        $sizeName = $size ? ($size->sizeName ?? $size->name ?? null) : null;
+        $colorName = $color ? ($color->getDisplayName() ?? $color->colorName ?? null) : null;
 
         // ✅ Fallback image
         $image = optional($product->image)->image
@@ -264,9 +259,12 @@ if ($price <= 0) {
                 'image'          => $image,
                 'old_price'      => (float) ($product->old_price ?? 0),
                 'purchase_price' => (float) ($product->purchase_price ?? 0),
-                'product_size'   => $request->product_size ?? null,
-                'product_color'  => $request->product_color ?? null,
-                'pro_unit'       => $request->pro_unit ?? null,
+                'product_size'     => $sizeName,
+                'product_color'    => $colorName,
+                'size_id'          => $request->product_size ?? null,
+                'color_id'         => $request->product_color ?? null,
+                'variant_price_id' => $variant->id ?? null,
+                'pro_unit'         => $request->pro_unit ?? null,
 
                 // 🔥 Advance
                 'advance_amount' => (float) ($product->advance_amount ?? 0),
@@ -290,34 +288,83 @@ if ($price <= 0) {
         return redirect()->back();
     }
 
-    // 🟢 Update cart (color/size change)
+    // 🟢 Update cart (color/size change and authoritative variant price)
     public function cart_update(Request $request)
     {
-        $rowId    = $request->id;
+        $rowId = $request->id;
         $cartItem = Cart::instance('shopping')->get($rowId);
 
-        if ($cartItem) {
-            Cart::instance('shopping')->update($rowId, [
-                'options' => [
-                    'product_size'   => $request->product_size ?: $cartItem->options->product_size,
-                    'product_color'  => $request->product_color ?: $cartItem->options->product_color,
-                    'slug'           => $cartItem->options->slug,
-                    'image'          => $cartItem->options->image,
-                    'old_price'      => $cartItem->options->old_price,
-                    'purchase_price' => $cartItem->options->purchase_price,
-                    'pro_unit'       => $cartItem->options->pro_unit,
-
-                    // 🔥 পুরানো advance_amount টাকে রেখে দাও
-                    'advance_amount' => $cartItem->options->advance_amount ?? 0,
-
-                    // 🔥 Digital flag আগের মতোই থাকবে
-                    'is_digital'     => $cartItem->options->is_digital ?? 0,
-
-                    // 🔥 Free Delivery flag আগের মতোই থাকবে
-                    'free_delivery'  => $cartItem->options->free_delivery ?? 0,
-                ],
-            ]);
+        if (!$cartItem) {
+            return response()->json(['message' => 'Cart item not found.'], 404);
         }
+
+        $product = Product::find($cartItem->id);
+        if (!$product) {
+            return response()->json(['message' => 'Product not found.'], 404);
+        }
+
+        // New campaign pages send IDs explicitly. Resolve legacy name-only requests too.
+        $sizeId = $request->input('product_size_id', $request->input('size_id'));
+        $colorId = $request->input('product_color_id', $request->input('color_id'));
+        if (!$sizeId && $request->filled('product_size')) {
+            $sizeId = Size::where('sizeName', $request->product_size)->value('id');
+        }
+        if (!$colorId && $request->filled('product_color')) {
+            $colorId = Color::where('colorName', $request->product_color)->value('id');
+        }
+
+        $size = $sizeId ? Size::find($sizeId) : null;
+        $color = $colorId ? Color::find($colorId) : null;
+        $sizeName = $size ? ($size->sizeName ?? $size->name ?? null) : ($request->product_size ?: ($cartItem->options->product_size ?? null));
+        $colorName = $color ? ($color->getDisplayName() ?? $color->colorName ?? null) : ($request->product_color ?: ($cartItem->options->product_color ?? null));
+
+        $variant = null;
+        $variantMatrix = ProductVariantPrice::where('product_id', $product->id);
+        $hasVariantPrices = (clone $variantMatrix)->exists();
+        if ($hasVariantPrices) {
+            $requiresSize = (clone $variantMatrix)->whereNotNull('size_id')->exists();
+            $requiresColor = (clone $variantMatrix)->whereNotNull('color_id')->exists();
+
+            if (($requiresSize && !$sizeId) || ($requiresColor && !$colorId)) {
+                return response()->json(['message' => 'প্রয়োজনীয় সাইজ ও কালার নির্বাচন করুন।'], 422);
+            }
+
+            $variant = (clone $variantMatrix)
+                ->when($requiresSize, fn ($query) => $query->where('size_id', $sizeId))
+                ->when($requiresColor, fn ($query) => $query->where('color_id', $colorId))
+                ->first();
+
+            if (!$variant) {
+                return response()->json(['message' => 'নির্বাচিত ভ্যারিয়েন্টটি পাওয়া যায়নি। অন্য সাইজ বা কালার বেছে নিন।'], 422);
+            }
+        }
+
+        if ($variant && $variant->stock !== null && (int) $variant->stock < (int) $cartItem->qty) {
+            return response()->json(['message' => 'নির্বাচিত ভ্যারিয়েন্টে পর্যাপ্ত স্টক নেই।'], 422);
+        }
+
+        $price = $variant && $variant->price > 0
+            ? (float) $variant->price
+            : (float) ($product->new_price ?? $product->old_price ?? $cartItem->price);
+
+        Cart::instance('shopping')->update($rowId, [
+            'price' => $price,
+            'options' => [
+                'product_size'     => $sizeName,
+                'product_color'    => $colorName,
+                'size_id'          => $sizeId ?: null,
+                'color_id'         => $colorId ?: null,
+                'variant_price_id' => $variant->id ?? null,
+                'slug'             => $cartItem->options->slug ?? $product->slug,
+                'image'            => $cartItem->options->image ?? 'public/uploads/default.webp',
+                'old_price'        => $cartItem->options->old_price ?? (float) ($product->old_price ?? 0),
+                'purchase_price'   => $cartItem->options->purchase_price ?? (float) ($product->purchase_price ?? 0),
+                'pro_unit'         => $cartItem->options->pro_unit ?? ($product->pro_unit ?? null),
+                'advance_amount'   => $cartItem->options->advance_amount ?? (float) ($product->advance_amount ?? 0),
+                'is_digital'       => $cartItem->options->is_digital ?? (int) ($product->is_digital ?? 0),
+                'free_delivery'    => $cartItem->options->free_delivery ?? (int) ($product->free_delivery ?? 0),
+            ],
+        ]);
 
         $data = Cart::instance('shopping')->content();
         return view('frontEnd.layouts.ajax.cart', compact('data'));
@@ -335,7 +382,18 @@ if ($price <= 0) {
     public function cart_increment(Request $request)
     {
         $item = Cart::instance('shopping')->get($request->id);
-        $qty  = $item->qty + 1;
+        if (!$item) {
+            return response()->json(['message' => 'Cart item not found.'], 404);
+        }
+
+        $qty = $item->qty + 1;
+        $variantId = $item->options->variant_price_id ?? null;
+        if ($variantId) {
+            $variant = ProductVariantPrice::find($variantId);
+            if ($variant && $variant->stock !== null && (int) $variant->stock < $qty) {
+                return response()->json(['message' => 'নির্বাচিত ভ্যারিয়েন্টে আর স্টক নেই।'], 422);
+            }
+        }
 
         Cart::instance('shopping')->update($request->id, $qty);
 
