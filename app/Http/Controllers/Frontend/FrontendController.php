@@ -1362,6 +1362,3 @@ $brands = Brand::where('status', 1)
         return view('frontEnd.layouts.pages.wholesale_products', compact('products', 'categories'));
     }
 }
-.wholesale_products', compact('products', 'categories'));
-    }
-}
