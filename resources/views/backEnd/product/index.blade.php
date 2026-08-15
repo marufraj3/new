@@ -150,6 +150,9 @@
                                         @endphp
                                         <div class="fw-bold text-dark">৳{{ number_format($value->new_price, 2) }}</div>
                                         <small class="text-muted">Total Stock: <span class="{{ $totalStock <= 5 ? 'text-danger fw-bold' : '' }}">{{$totalStock}}</span></small>
+                                        @if($totalStock <= 0)
+                                            <span class="badge bg-danger font-size-10 d-block mt-1" style="width:fit-content;">Stock Out</span>
+                                        @endif
                                     </td>
                                     <td>
                                         <div class="d-flex flex-column gap-1">

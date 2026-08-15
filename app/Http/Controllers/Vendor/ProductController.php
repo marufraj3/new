@@ -65,7 +65,7 @@ class ProductController extends Controller
 
         $query = Product::where('vendor_id', $vendorId)
             ->orderBy('id','DESC')
-            ->with('image','category');
+            ->with('image','category','variantPrices');
 
         if ($request->keyword) {
             $query->where('name', 'LIKE', '%' . $request->keyword . "%");

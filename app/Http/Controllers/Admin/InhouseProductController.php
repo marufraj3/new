@@ -23,7 +23,7 @@ class InhouseProductController extends Controller
         // Show only inhouse products (vendor_id is null)
         $query = Product::whereNull('vendor_id')
             ->orderBy('id','DESC')
-            ->with('image','category');
+            ->with('image','category','variantPrices');
 
         if ($request->keyword) {
             $query->where('name', 'LIKE', '%' . $request->keyword . "%");

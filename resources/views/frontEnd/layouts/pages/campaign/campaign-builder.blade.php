@@ -18,14 +18,53 @@
             ? (float) $firstProduct->old_price - (float) $firstProduct->new_price
             : 0;
         $storefrontProducts = $products->map(function ($product) {
+            // Size/Color names must come from variantPrices first (admin panel now
+            // creates variants there); the old productsizes/productcolors pivots are
+            // only a fallback. Otherwise the front end shows raw IDs like "Size 23".
+            $sizeOptions = [];
+            $colorOptions = [];
+            foreach ($product->variantPrices ?? [] as $variant) {
+                if ($variant->size_id && $variant->size) {
+                    if (!isset($sizeOptions[$variant->size_id])) {
+                        $sizeOptions[$variant->size_id] = [
+                            'id' => (string) $variant->size_id,
+                            'name' => $variant->size->sizeName ?? $variant->size->name ?? ('Size ' . $variant->size_id),
+                            'stock' => 0,
+                            'has_stock' => false,
+                        ];
+                    }
+                    if ($variant->stock !== null) {
+                        $sizeOptions[$variant->size_id]['stock'] += max(0, (int) $variant->stock);
+                        $sizeOptions[$variant->size_id]['has_stock'] = true;
+                    }
+                }
+                if ($variant->color_id && $variant->color) {
+                    $colorOptions[$variant->color_id] = [
+                        'id' => (string) $variant->color_id,
+                        'name' => $variant->color->colorName ?? $variant->color->name ?? ('Color ' . $variant->color_id),
+                        'hex' => $variant->color->color ?? '',
+                    ];
+                }
+            }
+            foreach ($product->sizes ?? [] as $size) {
+                if (!isset($sizeOptions[$size->id])) {
+                    $sizeOptions[$size->id] = ['id' => (string) $size->id, 'name' => $size->sizeName ?? $size->size_name ?? $size->name ?? '', 'stock' => 0, 'has_stock' => false];
+                }
+            }
+            foreach ($product->colors ?? [] as $color) {
+                if (!isset($colorOptions[$color->id])) {
+                    $colorOptions[$color->id] = ['id' => (string) $color->id, 'name' => $color->colorName ?? $color->color_name ?? $color->name ?? '', 'hex' => $color->color ?? ''];
+                }
+            }
+
             return [
                 'id' => (string) $product->id,
                 'name' => strip_tags($product->name ?? ''),
                 'price' => (float) $product->new_price,
                 'old_price' => (float) $product->old_price,
                 'image' => asset(optional($product->image)->image ?? 'public/uploads/default.webp'),
-                'sizes' => optional($product->sizes)->map(fn ($size) => ['id' => (string) $size->id, 'name' => $size->sizeName ?? $size->size_name ?? $size->name ?? ''])->values() ?? collect(),
-                'colors' => optional($product->colors)->map(fn ($color) => ['id' => (string) $color->id, 'name' => $color->colorName ?? $color->color_name ?? $color->name ?? '', 'hex' => $color->color ?? ''])->values() ?? collect(),
+                'sizes' => array_values($sizeOptions),
+                'colors' => array_values($colorOptions),
                 'variants' => optional($product->variantPrices)->map(fn ($variant) => [
                     'size_id' => $variant->size_id ? (string) $variant->size_id : null,
                     'color_id' => $variant->color_id ? (string) $variant->color_id : null,

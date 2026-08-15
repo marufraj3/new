@@ -389,7 +389,7 @@ $brands = Brand::where('status', 1)
         if ($variantPrice && $variantPrice->price > 0) {
             $finalPrice = $variantPrice->price;
         } elseif (!empty($product->new_price) && $product->new_price > 0) {
-            $finalPrice = $product->new_prie = $product->old_price;
+            $finalPrice = $product->new_price;
         } else {
             $finalPrice = 1; // fallback price
         }
@@ -951,7 +951,15 @@ $brands = Brand::where('status', 1)
             ?? 'public/uploads/default.webp';
 
         $url          = route('product', $p->slug);
-        $displayStock = !empty($p->is_wholesale) ? 99999 : (int) ($p->stock ?? 0);
+
+        // ভ্যারিয়েন্ট স্টক থাকলে সব সাইজ/কালারের মোট স্টকই আসল স্টক
+        $variantRows = $p->variantPrices ?? collect();
+        $hasVariantStock = $variantRows->contains(fn ($v) => $v->stock !== null);
+        $displayStock = !empty($p->is_wholesale)
+            ? 99999
+            : ($hasVariantStock
+                ? (int) $variantRows->sum(fn ($v) => max(0, (int) $v->stock))
+                : (int) ($p->stock ?? 0));
 
         $sizes = []; $colors = []; $variants = [];
 

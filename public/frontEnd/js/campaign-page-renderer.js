@@ -130,7 +130,11 @@
 
     function fillSelect(select, options, placeholder) {
         if (!select) return;
-        select.innerHTML = '<option value="">' + escapeHtml(placeholder) + '</option>' + options.map(option => '<option value="' + escapeHtml(option.id) + '" data-name="' + escapeHtml(option.name) + '">' + escapeHtml(option.name) + '</option>').join('');
+        select.innerHTML = '<option value="">' + escapeHtml(placeholder) + '</option>' + options.map(option => {
+            const isOut = option.has_stock && Number(option.stock) <= 0;
+            const label = option.name + (option.has_stock ? (isOut ? ' — স্টক শেষ' : ' (' + option.stock + ' টি আছে)') : '');
+            return '<option value="' + escapeHtml(option.id) + '" data-name="' + escapeHtml(option.name) + '"' + (isOut ? ' disabled' : '') + '>' + escapeHtml(label) + '</option>';
+        }).join('');
         select.required = options.length > 0;
     }
 

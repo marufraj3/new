@@ -437,7 +437,7 @@ class ShoppingController extends Controller
         return view('frontEnd.layouts.ajax.sidebar-cart', compact('generalsetting'));
     }
 
-    // 🟢 Change product from campaign or offers
+    // 🟢 Change product from campaign or offers (supports size/color variant selection)
     public function changeProduct(Request $request)
     {
         $productId = $request->input('id');
@@ -450,18 +450,67 @@ class ShoppingController extends Controller
             ]);
         }
 
+        $sizeId  = $request->input('product_size') ?: null;
+        $colorId = $request->input('product_color') ?: null;
+        $qty     = max(1, (int) $request->input('qty', 1));
+
+        // ভ্যারিয়েন্ট রিজলভ (size/color আইডি থেকে) + স্টক ভ্যালিডেশন
+        $variant = null;
+        $variantRows = ProductVariantPrice::where('product_id', $product->id)->get();
+        if ($variantRows->isNotEmpty() && ($sizeId || $colorId)) {
+            // exact match আগে, তারপর null-tolerant match (কিছু row-তে color/size null থাকতে পারে)
+            $variant = $variantRows
+                ->filter(function ($row) use ($sizeId, $colorId) {
+                    $sizeOk  = !$sizeId  || $row->size_id === null  || (string) $row->size_id === (string) $sizeId;
+                    $colorOk = !$colorId || $row->color_id === null || (string) $row->color_id === (string) $colorId;
+                    return $sizeOk && $colorOk;
+                })
+                ->sortByDesc(function ($row) use ($sizeId, $colorId) {
+                    // বেশি নির্দিষ্ট row আগে (size+color উভয়ে মিললে সর্বোচ্চ স্কোর)
+                    $score = 0;
+                    if ($sizeId && (string) $row->size_id === (string) $sizeId) $score += 2;
+                    if ($colorId && (string) $row->color_id === (string) $colorId) $score += 2;
+                    return $score;
+                })
+                ->first();
+
+            if (!$variant) {
+                return response()->json(['message' => 'নির্বাচিত সাইজ/কালারটি পাওয়া যায়নি।'], 422);
+            }
+
+            if ($variant->stock !== null && (int) $variant->stock < $qty) {
+                return response()->json(['message' => 'নির্বাচিত সাইজ/কালারটি স্টকে নেই।'], 422);
+            }
+        }
+
+        $size  = $sizeId ? Size::find($sizeId) : null;
+        $color = $colorId ? Color::find($colorId) : null;
+        $sizeName  = $size ? ($size->sizeName ?? $size->name ?? null) : null;
+        $colorName = $color ? ($color->getDisplayName() ?? $color->colorName ?? null) : null;
+
+        $price = $variant && $variant->price > 0
+            ? (float) $variant->price
+            : (float) ($product->new_price ?? $product->old_price ?? 1);
+
         Cart::instance('shopping')->destroy();
 
         Cart::instance('shopping')->add([
             'id'   => $product->id,
             'name' => $product->name,
-            'qty'  => 1,
-            'price'=> (float) ($product->new_price ?? $product->old_price ?? 1),
+            'qty'  => $qty,
+            'price'=> $price,
             'options' => [
                 'slug'           => $product->slug,
                 'image'          => optional($product->image)->image ?? 'public/uploads/default.webp',
                 'old_price'      => (float) ($product->old_price ?? 0),
                 'purchase_price' => (float) ($product->purchase_price ?? 0),
+
+                // 🔥 Variant info (size & color)
+                'product_size'     => $sizeName,
+                'product_color'    => $colorName,
+                'size_id'          => $sizeId,
+                'color_id'         => $colorId,
+                'variant_price_id' => $variant->id ?? null,
 
                 // 🔥 Advance
                 'advance_amount' => (float) ($product->advance_amount ?? 0),
