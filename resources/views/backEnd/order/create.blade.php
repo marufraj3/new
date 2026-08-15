@@ -263,6 +263,30 @@
                     @csrf
                     <input type="hidden" name="coupon_code" value="{{ Session::get('pos_coupon_code', '') }}">
 
+                    {{-- POS payment and discount controls --}}
+                    <div class="col-12 mb-3">
+                        <div class="row g-2 p-2 rounded" style="background:#f8fafc;border:1px solid #e2e8f0">
+                            <div class="col-md-3">
+                                <label class="small text-muted">Manual Discount (৳)</label>
+                                <input type="number" min="0" step="0.01" name="discount" class="form-control form-control-sm" value="0">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="small text-muted">Paid Amount (৳)</label>
+                                <input type="number" min="0" step="0.01" name="paid_amount" class="form-control form-control-sm" value="0">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="small text-muted">Payment Method</label>
+                                <select name="payment_method" class="form-select form-select-sm">
+                                    <option>Cash On Delivery</option>
+                                    <option>Cash</option><option>bKash</option><option>Nagad</option><option>Rocket</option><option>Bank Transfer</option><option>Card</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3 d-flex align-items-end">
+                                <small class="text-muted">Paid amount cannot exceed the final order total.</small>
+                            </div>
+                        </div>
+                    </div>
+
                     {{-- CUSTOMER --}}
                     <div class="col-md-6">
                         <div class="pos-section-title">Customer</div>
@@ -334,6 +358,10 @@
                             <tr>
                                 <td>কুপন ডিস্কাউন্ট</td>
                                 <td class="text-end">৳{{$couponDiscount}}</td>
+                            </tr>
+                            <tr>
+                                <td>Manual Discount</td>
+                                <td class="text-end" id="pos_manual_discount_display">৳0.00</td>
                             </tr>
                             <tr>
                                 <td>Grand Total</td>
@@ -551,6 +579,16 @@
                 cart_details();
             }
         });
+    });
+
+    // -------- MANUAL DISCOUNT PREVIEW ----------
+    $(document).on('input', 'input[name="discount"]', function () {
+        var discount = Math.max(0, parseFloat($(this).val()) || 0);
+        $('#pos_manual_discount_display').text('৳' + discount.toFixed(2));
+        var subtotal = parseFloat(String($('#cart_details tr').eq(0).find('td:last').text()).replace(/[^0-9.]/g, '')) || 0;
+        var shipping = parseFloat(String($('#cart_details tr').eq(1).find('td:last').text()).replace(/[^0-9.]/g, '')) || 0;
+        var coupon = parseFloat(String($('#cart_details tr').eq(2).find('td:last').text()).replace(/[^0-9.]/g, '')) || 0;
+        $('.pos-grand-total').text('৳' + Math.max(0, subtotal + shipping - coupon - discount).toFixed(2));
     });
 
     // -------- SHIPPING CHANGE ----------

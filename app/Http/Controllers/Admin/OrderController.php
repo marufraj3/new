@@ -61,11 +61,20 @@ class OrderController extends Controller
         // 1) প্রথমবার active status এ ঢুকলে স্টক কমবে
         if (in_array($newStatus, $activeStatuses) && !in_array($oldStatus, $activeStatuses)) {
             $details = OrderDetails::where('order_id', $order->id)
-                ->with('product:id,stock') // ✅ Eager load products to avoid N+1
+                ->with('product:id,stock')
                 ->get();
 
             foreach ($details as $row) {
-                if ($row->product) {
+                $variant = $row->variant_price_id
+                    ? ProductVariantPrice::find($row->variant_price_id)
+                    : ProductVariantPrice::where('product_id', $row->product_id)
+                        ->when($row->product_size, fn($q) => $q->where('size_id', $row->product_size))
+                        ->when($row->product_color, fn($q) => $q->where('color_id', $row->product_color))
+                        ->first();
+                if ($variant && $variant->stock !== null) {
+                    $variant->stock = max(0, (int) $variant->stock - (int) $row->qty);
+                    $variant->save();
+                } elseif ($row->product) {
                     $row->product->stock = max(0, $row->product->stock - $row->qty);
                     $row->product->save();
                 }
@@ -75,11 +84,20 @@ class OrderController extends Controller
         // 2) cancel (11) হলে, যদি আগেরটা active group এ থাকে -> স্টক রিস্টোর
         if ($newStatus == 11 && in_array($oldStatus, $activeStatuses)) {
             $details = OrderDetails::where('order_id', $order->id)
-                ->with('product:id,stock') // ✅ Eager load products to avoid N+1
+                ->with('product:id,stock')
                 ->get();
 
             foreach ($details as $row) {
-                if ($row->product) {
+                $variant = $row->variant_price_id
+                    ? ProductVariantPrice::find($row->variant_price_id)
+                    : ProductVariantPrice::where('product_id', $row->product_id)
+                        ->when($row->product_size, fn($q) => $q->where('size_id', $row->product_size))
+                        ->when($row->product_color, fn($q) => $q->where('color_id', $row->product_color))
+                        ->first();
+                if ($variant && $variant->stock !== null) {
+                    $variant->stock = (int) $variant->stock + (int) $row->qty;
+                    $variant->save();
+                } elseif ($row->product) {
                     $row->product->stock = $row->product->stock + $row->qty;
                     $row->product->save();
                 }
@@ -392,8 +410,10 @@ class OrderController extends Controller
                     'status:id,name,slug',
                     'customer:id,name,phone,email',
                     'user:id,name,email',
-                    'orderdetails:id,order_id,product_id,vendor_id,product_name,qty,sale_price',
-                    'orderdetails.vendor:id,shop_name,owner_name'
+                    'orderdetails:id,order_id,product_id,vendor_id,product_name,qty,sale_price,product_size,product_color',
+                    'payment:id,order_id,amount,payment_method,payment_status',
+                    'orderdetails.vendor:id,shop_name,owner_name',
+                    'orderdetails.product:id,is_digital'
                 ]);
 
             if ($request->keyword) {
@@ -418,8 +438,10 @@ class OrderController extends Controller
                     'status:id,name,slug',
                     'customer:id,name,phone,email',
                     'user:id,name,email',
-                    'orderdetails:id,order_id,product_id,vendor_id,product_name,qty,sale_price',
-                    'orderdetails.vendor:id,shop_name,owner_name'
+                    'orderdetails:id,order_id,product_id,vendor_id,product_name,qty,sale_price,product_size,product_color',
+                    'payment:id,order_id,amount,payment_method,payment_status',
+                    'orderdetails.vendor:id,shop_name,owner_name',
+                    'orderdetails.product:id,is_digital'
                 ])
                 ->paginate(10);
         }
@@ -877,6 +899,39 @@ class OrderController extends Controller
         $orderstatus = OrderStatus::all();
 
         return view('backEnd.order.invoice', compact('order', 'orderstatus'));
+    }
+
+    public function quickView($invoice_id)
+    {
+        $order = Order::where('invoice_id', $invoice_id)
+            ->with(['shipping', 'payment', 'status', 'orderdetails.size', 'orderdetails.color'])
+            ->firstOrFail();
+
+        return response()->json([
+            'invoice_id' => $order->invoice_id,
+            'customer' => optional($order->shipping)->name,
+            'phone' => optional($order->shipping)->phone,
+            'address' => optional($order->shipping)->address,
+            'date' => optional($order->created_at)->format('d M Y, h:i A'),
+            'status' => optional($order->status)->name,
+            'amount' => (float) $order->amount,
+            'discount' => (float) ($order->discount ?? 0),
+            'paid' => (float) ($order->paid_amount ?? optional($order->payment)->amount ?? 0),
+            'payment_method' => $order->payment_method ?? optional($order->payment)->payment_method,
+            'shipping_charge' => (float) ($order->shipping_charge ?? 0),
+            'utm_source' => $order->utm_source,
+            'utm_medium' => $order->utm_medium,
+            'utm_campaign' => $order->utm_campaign,
+            'items' => $order->orderdetails->map(function ($item) {
+                return [
+                    'name' => $item->product_name,
+                    'size' => optional($item->size)->sizeName ?? optional($item->size)->size_name ?? $item->product_size,
+                    'color' => optional($item->color)->colorName ?? optional($item->color)->color_name ?? $item->product_color,
+                    'qty' => (int) $item->qty,
+                    'price' => (float) $item->sale_price,
+                ];
+            })->values(),
+        ]);
     }
 
     public function process($invoice_id)
@@ -1785,8 +1840,10 @@ class OrderController extends Controller
 
         $subtotalRaw = Cart::instance('pos_shopping')->subtotal();
         $subtotal   = (float) preg_replace('/[^\d.]/', '', (string) $subtotalRaw);
-        $discount   = (float) (Session::get('pos_discount') ?? 0);
-        $shippingfee = ShippingCharge::find($request->area);
+        // POS supports both a coupon discount and a manually entered discount.
+        $manualDiscount = max(0, (float) $request->input('discount', 0));
+        $discount       = min($subtotal, (float) (Session::get('pos_discount') ?? 0) + $manualDiscount);
+        $shippingfee    = ShippingCharge::find($request->area);
 
         $exits_customer = Customer::where('phone', $request->phone)
             ->select('phone', 'id')->first();
@@ -1808,12 +1865,20 @@ class OrderController extends Controller
 
         $order                  = new Order();
         $order->invoice_id      = rand(11111, 99999);
-        $order->amount          = ($subtotal + (isset($shippingfee->amount) ? $shippingfee->amount : 0)) - $discount;
-        $order->discount        = $discount ? $discount : 0;
-        $order->shipping_charge = isset($shippingfee->amount) ? $shippingfee->amount : 0;
+        $orderTotal             = max(0, ($subtotal + (float) ($shippingfee->amount ?? 0)) - $discount);
+        $paidAmount             = min($orderTotal, max(0, (float) $request->input('paid_amount', 0)));
+        $order->amount          = $orderTotal;
+        $order->discount        = $discount;
+        $order->shipping_charge = (float) ($shippingfee->amount ?? 0);
+        $order->paid_amount     = $paidAmount;
+        $order->payment_method  = $request->input('payment_method', 'Cash On Delivery');
         $order->customer_id     = $customer_id;
         $order->order_status    = 1;
         $order->note            = $request->note;
+        $utm = Session::get('order_utm', []);
+        foreach (['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'] as $utmKey) {
+            $order->{$utmKey} = $utm[$utmKey] ?? null;
+        }
         $order->save();
 
         $shipping              = new Shipping();
@@ -1828,9 +1893,9 @@ class OrderController extends Controller
         $payment                 = new Payment();
         $payment->order_id       = $order->id;
         $payment->customer_id    = $customer_id;
-        $payment->payment_method = 'Cash On Delivery';
-        $payment->amount         = $order->amount;
-        $payment->payment_status = 'pending';
+        $payment->payment_method = $order->payment_method;
+        $payment->amount         = $paidAmount;
+        $payment->payment_status = $paidAmount >= $order->amount && $order->amount > 0 ? 'paid' : ($paidAmount > 0 ? 'partial' : 'pending');
         $payment->save();
 
         foreach (Cart::instance('pos_shopping')->content() as $cart) {
@@ -1876,6 +1941,7 @@ class OrderController extends Controller
             $order_details->qty              = $cart->qty;
             $order_details->product_size     = $savedSize;
             $order_details->product_color    = $savedColor;
+            $order_details->variant_price_id = $cart->options->variant_price_id ?? null;
             $order_details->save();
         }
 
@@ -1883,7 +1949,7 @@ class OrderController extends Controller
         $this->handleStockChange($order, 0, (int) $order->order_status);
 
         Cart::instance('pos_shopping')->destroy();
-        Session::forget(['pos_shipping', 'pos_discount', 'pos_coupon_code']);
+        Session::forget(['pos_shipping', 'pos_discount', 'pos_coupon_code', 'order_utm']);
 
         Toastr::success('Thanks, Your order place successfully', 'Success!');
         return redirect('admin/order/pending');

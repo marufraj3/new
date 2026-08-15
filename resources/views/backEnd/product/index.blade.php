@@ -141,8 +141,15 @@
                                         </small>
                                     </td>
                                     <td>
+                                        @php
+                                            $variantRows = $value->variantPrices ?? collect();
+                                            $hasVariantStock = $variantRows->contains(fn($v) => $v->stock !== null);
+                                            $totalStock = $hasVariantStock
+                                                ? $variantRows->sum(fn($v) => max(0, (int) $v->stock))
+                                                : (int) ($value->stock ?? 0);
+                                        @endphp
                                         <div class="fw-bold text-dark">৳{{ number_format($value->new_price, 2) }}</div>
-                                        <small class="text-muted">Stock: <span class="{{ $value->stock <= 5 ? 'text-danger fw-bold' : '' }}">{{$value->stock}}</span></small>
+                                        <small class="text-muted">Total Stock: <span class="{{ $totalStock <= 5 ? 'text-danger fw-bold' : '' }}">{{$totalStock}}</span></small>
                                     </td>
                                     <td>
                                         <div class="d-flex flex-column gap-1">

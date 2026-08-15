@@ -338,17 +338,28 @@
                 <p>Size & Variant - <span class="attibute-name"></span></p>
                 <div class="size-container">
                     <div class="selector">
-                        @foreach ($productsizes as $prosize)
+                                @foreach ($productsizes as $prosize)
+                            @php
+                                $sizeStock = $details->variantPrices->where('size_id', $prosize->id)->sum(function ($variant) {
+                                    return $variant->stock !== null ? (int) $variant->stock : 0;
+                                });
+                                $hasSizeStock = $details->variantPrices->where('size_id', $prosize->id)->contains(function ($variant) {
+                                    return $variant->stock !== null;
+                                });
+                            @endphp
                             <div class="selector-item">
-                                {{-- ✅ এখন size_id পাঠানো হচ্ছে --}}
                                 <input type="radio"
                                     id="f-option{{ $prosize->id }}"
                                     value="{{ $prosize->id }}"
                                     name="product_size"
                                     class="selector-item_radio emptyalert"
+                                    {{ $hasSizeStock && $sizeStock <= 0 ? 'disabled' : '' }}
                                     required />
-                                <label for="f-option{{ $prosize->id }}" class="selector-item_label">
+                                <label for="f-option{{ $prosize->id }}" class="selector-item_label {{ $hasSizeStock && $sizeStock <= 0 ? 'text-decoration-line-through opacity-50' : '' }}">
                                     {{ $prosize->sizeName ?? $prosize->name }}
+                                    @if($hasSizeStock)
+                                        <small class="d-block {{ $sizeStock > 0 ? 'text-success' : 'text-danger' }}">{{ $sizeStock > 0 ? $sizeStock.' টি আছে' : 'স্টক শেষ' }}</small>
+                                    @endif
                                 </label>
                             </div>
                         @endforeach

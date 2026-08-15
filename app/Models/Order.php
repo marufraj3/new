@@ -9,6 +9,30 @@ class Order extends Model
 {
     use HasFactory;
 
+    protected static function booted(): void
+    {
+        static::creating(function (Order $order) {
+            if (function_exists('request') && request()->hasSession()) {
+                $utm = request()->session()->get('order_utm', []);
+                foreach (['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'] as $key) {
+                    if (!$order->{$key} && !empty($utm[$key])) {
+                        $order->{$key} = $utm[$key];
+                    }
+                }
+            }
+        });
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'amount' => 'decimal:2',
+            'discount' => 'decimal:2',
+            'shipping_charge' => 'decimal:2',
+            'paid_amount' => 'decimal:2',
+        ];
+    }
+
     // সব ফিল্ড mass assign করতে পারবে
     protected $guarded = [];
 

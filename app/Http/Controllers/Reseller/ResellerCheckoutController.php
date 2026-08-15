@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use App\Models\Product;
+use App\Models\ProductVariantPrice;
 use App\Models\ShippingCharge;
 use App\Models\Customer;
 use App\Models\Order;
@@ -368,10 +369,20 @@ class ResellerCheckoutController extends Controller
 
         // Stock reduce
         foreach ($order->orderdetails as $detail) {
-            $product = Product::find($detail->product_id);
-            if ($product && $product->stock >= $detail->qty) {
-                $product->stock -= $detail->qty;
-                $product->save();
+            $variant = $detail->variant_price_id
+                ? ProductVariantPrice::find($detail->variant_price_id)
+                : ProductVariantPrice::where('product_id', $detail->product_id)
+                    ->when($detail->product_size, fn($q) => $q->where('size_id', $detail->product_size))
+                    ->when($detail->product_color, fn($q) => $q->where('color_id', $detail->product_color))
+                    ->first();
+            if ($variant && $variant->stock !== null) {
+                $variant->stock = max(0, (int) $variant->stock - (int) $detail->qty);
+                $variant->save();
+            } elseif ($product = Product::find($detail->product_id)) {
+                if ($product->stock >= $detail->qty) {
+                    $product->stock -= $detail->qty;
+                    $product->save();
+                }
             }
         }
 
