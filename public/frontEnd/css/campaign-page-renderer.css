@@ -54,6 +54,15 @@ body.cpb-store-busy { overflow: hidden; }
 .cpb-cartlist .quantity button { width: 31px; height: 31px; padding: 0; border: 0; color: #344054; background: #f1f4f7; font-weight: 800; }
 .cpb-cartlist .quantity input { width: 34px; height: 31px; padding: 0; border: 0; outline: 0; text-align: center; }
 .cpb-cartlist .cart_remove { cursor: pointer; }
+/* bootstrap.min.css (216K) সরানো হয়েছে — কার্ট টেবিলের যে কয়টি ইউটিলিটি ক্লাস
+   লাগে সেগুলো এখানেই সংজ্ঞায়িত, যাতে পুরো ফ্রেমওয়ার্ক লোড করতে না হয়। */
+.cpb-cartlist .text-center { text-align: center; }
+.cpb-cartlist .text-start { text-align: left; }
+.cpb-cartlist .text-end { text-align: right; }
+.cpb-cartlist .text-muted { color: #7b8494; }
+.cpb-cartlist .d-block { display: block; }
+.cpb-cartlist .mb-0 { margin-bottom: 0; }
+.cpb-cartlist .table-striped tbody tr:nth-of-type(odd) { background: #fcfdfe; }
 .cpb-checkout-assurance { display: flex; padding: 12px 17px 16px; justify-content: center; flex-wrap: wrap; gap: 15px; color: #527060; font-size: 11px; font-weight: 700; }
 
 .cpb-customer-form form { padding: 19px; }

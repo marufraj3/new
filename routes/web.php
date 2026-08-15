@@ -142,9 +142,14 @@ Route::prefix('admin')->middleware(['auth:admin', 'admin', 'demo_mode'])->group(
     Route::post('/sitemap/generate', [SitemapController::class, 'generate'])->name('admin.sitemap.generate');
 });
 
-Route::post('/incomplete-order/store', 
-    [\App\Http\Controllers\Admin\IncompleteOrderController::class, 'store']
-)->middleware(['auth:admin', 'admin', 'demo_mode'])->name('incomplete.order.store');
+/*
+ * অ্যাবানডনড কার্ট ক্যাপচার — এটি কাস্টমার চেকআউট/ল্যান্ডিং পেজ থেকে কল হয়,
+ * তাই কোনো admin auth থাকতে পারবে না (আগে ['auth:admin','admin'] থাকায় প্রতিটি
+ * রিকোয়েস্ট ফেল করত)। স্প্যাম ঠেকাতে throttle দেওয়া হলো।
+ */
+Route::post('/incomplete-order/store', [\App\Http\Controllers\Frontend\FrontendController::class, 'storeIncompleteOrder'])
+    ->middleware('throttle:60,1')
+    ->name('incomplete.order.store');
 
 // RedX Webhook (CSRF excluded)
 Route::post('/api/redx/webhook', [\App\Http\Controllers\Admin\RedXWebhookController::class, 'handleWebhook'])

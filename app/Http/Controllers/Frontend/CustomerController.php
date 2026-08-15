@@ -830,6 +830,19 @@ public function order_save(Request $request)
             return redirect()->back();
         }
 
+        // ⭐ অর্ডার রেস্ট্রিকশন — অ্যাডমিন প্যানেলের Order Restriction Settings
+        // (order_limit_time / order_limit_qty) এখানে কার্যকর হয়। একই ফোন নম্বর বা
+        // একই IP থেকে নির্দিষ্ট সময়ে নির্দিষ্ট সংখ্যার বেশি অর্ডার আটকে দেওয়া হয়।
+        $restrictionMessage = app(\App\Services\OrderRestrictionService::class)
+            ->violationMessage($request->phone, $request->ip());
+
+        if ($restrictionMessage) {
+            Toastr::error($restrictionMessage, 'অর্ডার সীমা অতিক্রান্ত!');
+            return redirect()->back()
+                ->withErrors(['order_limit' => $restrictionMessage])
+                ->withInput();
+        }
+
         // ⭐ ভ্যারিয়েন্ট (সাইজ/কালার) ভ্যালিডেশন — অর্ডারের আগে স্টক নিশ্চিত করি
         foreach (Cart::instance('shopping')->content() as $cartItem) {
             $variantMatrix = ProductVariantPrice::where('product_id', $cartItem->id);
@@ -1094,7 +1107,18 @@ public function order_save(Request $request)
         }
 
         // Incomplete order delete
-        IncompleteOrder::where('phone', $request->phone)->delete();
+        // (সেভ করার সময় নম্বর normalize হয়, তাই দুই ফরম্যাটেই ডিলিট করা হচ্ছে)
+        $normalizedPhone = preg_replace('/[^0-9+]/', '', (string) $request->phone);
+        IncompleteOrder::whereIn('phone', array_unique(array_filter([$request->phone, $normalizedPhone])))->delete();
+
+        // ⭐ অটো ফ্রড চেক — আগে শুধু অ্যাডমিন ম্যানুয়ালি বাটনে ক্লিক করলে চলত।
+        // response পাঠানোর পরে (non-blocking) চলবে, তাই কাস্টমারকে অপেক্ষা করতে হয় না।
+        try {
+            app(\App\Services\FraudCheckService::class)
+                ->queueAfterResponse($request->phone, $order->id);
+        } catch (\Exception $e) {
+            Log::error('Auto fraud check setup failed for order ' . $order->id . ': ' . $e->getMessage());
+        }
 
         // =========================================================
         // ⭐ পেমেন্ট গেটওয়ে রিডাইরেক্ট (FIXED)

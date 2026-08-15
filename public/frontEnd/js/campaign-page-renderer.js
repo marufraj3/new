@@ -642,6 +642,124 @@
         if (stored === '1') apply(true, false);
     }
 
+    /* ============================================================
+       Abandoned cart capture (ইনকমপ্লিট অর্ডার)
+       ক্যাম্পেইন ল্যান্ডিং পেজই সবচেয়ে বেশি ট্রাফিক পায়, অথচ এতদিন এখান থেকে
+       কোনো লিড সেভ হতো না। কাস্টমার নাম/ফোন/ঠিকানা লিখলে (অর্ডার সাবমিট না
+       করলেও) সেটি /incomplete-order/store এ সেভ হয়, যাতে ফলো-আপ কল করা যায়।
+       ============================================================ */
+    function initAbandonedCart() {
+        const endpoint = root.dataset.incompleteOrderUrl;
+        if (!endpoint) return;
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        const nameField = document.getElementById('cpb-name');
+        const phoneField = document.getElementById('cpb-phone');
+        const addressField = document.getElementById('cpb-address');
+        if (!phoneField) return;
+
+        let debounceTimer = null;
+        let lastPayloadKey = '';
+        let orderPlaced = false;
+
+        function selectionSnapshot() {
+            const product = findProduct(confirmedSelection?.productId || selectedProductId) || products[0];
+            if (!product) return null;
+
+            const qty = Math.max(1, Number(confirmedSelection?.qty || 1));
+            const price = Number(confirmedSelection?.price || product.price || 0);
+            const parts = [];
+            if (confirmedSelection?.size?.name) parts.push('Size: ' + confirmedSelection.size.name);
+            if (confirmedSelection?.color?.name) parts.push('Color: ' + confirmedSelection.color.name);
+
+            return {
+                id: product.id,
+                name: parts.length ? product.name + ' (' + parts.join(', ') + ')' : product.name,
+                qty: qty,
+                price: price,
+                image: product.image || '',
+                link: window.location.href
+            };
+        }
+
+        function buildPayload() {
+            const phone = (phoneField.value || '').replace(/[^0-9+]/g, '');
+            /* ফোন নম্বর ছাড়া লিডের কোনো মানে নেই — ফলো-আপ করা যাবে না */
+            if (phone.length < 11) return null;
+
+            const item = selectionSnapshot();
+            if (!item) return null;
+
+            return {
+                name: (nameField?.value || '').trim(),
+                phone: phone,
+                address: (addressField?.value || '').trim(),
+                items: [item],
+                product_image: item.image,
+                product_link: item.link,
+                total_amount: Number((item.price * item.qty).toFixed(2)),
+                source: 'campaign_builder'
+            };
+        }
+
+        function send(immediate) {
+            if (orderPlaced) return;
+
+            const payload = buildPayload();
+            if (!payload) return;
+
+            /* একই তথ্য বারবার পাঠানো হবে না */
+            const key = JSON.stringify(payload);
+            if (key === lastPayloadKey) return;
+            lastPayloadKey = key;
+
+            try {
+                fetch(endpoint, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    keepalive: Boolean(immediate),
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': csrfToken
+                    },
+                    body: key
+                }).catch(() => {});
+            } catch (_) { /* ক্যাপচার ব্যর্থ হলে চেকআউট কখনোই ব্লক হবে না */ }
+        }
+
+        function schedule() {
+            window.clearTimeout(debounceTimer);
+            debounceTimer = window.setTimeout(() => send(false), 2000);
+        }
+
+        [nameField, phoneField, addressField].forEach(field => {
+            field?.addEventListener('input', schedule);
+            field?.addEventListener('change', schedule);
+        });
+
+        /* সাইজ/কালার কনফার্ম হওয়ার সাথে সাথে স্ন্যাপশট আপডেট */
+        document.addEventListener('campaign:product-selected', schedule);
+
+        /* পেজ ছেড়ে যাওয়ার আগে শেষ চেষ্টা */
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                window.clearTimeout(debounceTimer);
+                send(true);
+            }
+        });
+
+        /* অর্ডার সাবমিট হলে আর ইনকমপ্লিট হিসেবে সেভ হবে না
+           (order_save() নিজেই পুরনো রেকর্ড ডিলিট করে) */
+        document.addEventListener('submit', event => {
+            if (event.target.closest('[data-cpb-order-form]') && !event.defaultPrevented) {
+                orderPlaced = true;
+                window.clearTimeout(debounceTimer);
+            }
+        });
+    }
+
     function initAnalytics() {
         window.dataLayer = window.dataLayer || [];
         window.dataLayer.push({ ecommerce: null });
@@ -654,5 +772,6 @@
     mountDynamicContent();
     bindEvents();
     initDesignToggle();
+    initAbandonedCart();
     initAnalytics();
 })();

@@ -30,42 +30,16 @@ class IncompleteOrderController extends Controller
     }
 
     /**
-     * ইনকমপ্লিট অর্ডার স্টোর (AJAX থেকে)
+     * ইনকমপ্লিট অর্ডার স্টোর (AJAX থেকে)।
+     *
+     * @deprecated এই স্টোর লজিকটি এখন Frontend\FrontendController@storeIncompleteOrder-এ
+     * থাকে, কারণ কলারটি কাস্টমার-ফেসিং চেকআউট পেজ — অ্যাডমিন প্যানেল নয়।
+     * পুরনো কোনো কল যেন ভেঙে না যায় সেজন্য এখানে শুধু ফরওয়ার্ড করা হচ্ছে।
      */
     public function store(Request $request)
     {
-        if (!$request->has('items') || empty($request->items)) {
-            return response()->json([
-                'status'  => 'ignore',
-                'message' => 'No items in cart, skip saving.',
-            ]);
-        }
-
-        $request->validate([
-            'name'          => 'nullable|string|max:255',
-            'phone'         => 'nullable|string|max:55',
-            'address'       => 'nullable|string',
-            'items'         => 'nullable|array',
-            'product_image' => 'nullable|string',
-            'product_link'  => 'nullable|string',
-            'total_amount'  => 'nullable|numeric',
-        ]);
-
-        $order = IncompleteOrder::create([
-            'name'          => $request->name,
-            'phone'         => $request->phone,
-            'address'       => $request->address,
-            'items'         => $request->items,
-            'product_image' => $request->product_image,
-            'product_link'  => $request->product_link,
-            'total_amount'  => $request->total_amount,
-        ]);
-
-        return response()->json([
-            'status'  => 'success',
-            'message' => 'Incomplete order saved successfully',
-            'data'    => $order,
-        ]);
+        return app(\App\Http\Controllers\Frontend\FrontendController::class)
+            ->storeIncompleteOrder($request);
     }
 
     /**

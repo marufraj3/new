@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     @php
         $pixels = $pixels ?? collect();
         $gtm_code = $gtm_code ?? collect();
@@ -113,8 +114,9 @@
     <meta property="og:url" content="{{ route('campaign', $campaign_data->slug) }}">
     @if($campaignImage)<meta property="og:image" content="{{ asset($campaignImage) }}">@endif
     <link rel="shortcut icon" href="{{ asset(optional($generalsetting)->favicon) }}" type="image/x-icon">
-    <link rel="stylesheet" href="{{ asset('public/frontEnd/campaign/css/all.css') }}">
-    <link rel="stylesheet" href="{{ asset('public/frontEnd/campaign/css/bootstrap.min.css') }}">
+    {{-- bootstrap.min.css (216K), FontAwesome all.css (140K) ও jQuery (88K) সরানো হয়েছে —
+         এই পেজের সব স্টাইল campaign-page-renderer.css + builder-এর page_css থেকে আসে
+         এবং renderer JS সম্পূর্ণ vanilla। FB ads ট্রাফিকের জন্য ~৩৫০KB সাশ্রয়। --}}
     <link rel="stylesheet" href="{{ asset('public/frontEnd/css/campaign-page-renderer.css') }}">
     <style id="campaign-builder-page-css">{!! $campaign_data->page_css !!}</style>
 
@@ -173,6 +175,7 @@
         data-cart-decrement-url="{{ route('cart.decrement') }}"
         data-cart-remove-url="{{ route('cart.remove') }}"
         data-shipping-url="{{ route('shipping.charge') }}"
+        data-incomplete-order-url="{{ route('incomplete.order.store') }}"
     >
         {!! $publishedHtml !!}
     </main>
@@ -244,10 +247,9 @@
     </button>
 
     <div id="cpb-store-loading" class="cpb-store-loading" hidden><span></span><strong>আপনার অর্ডার আপডেট হচ্ছে...</strong></div>
-    <button id="cpb-sticky-order" class="cpb-sticky-order" type="button" hidden><i class="fas fa-shopping-bag"></i><span>এখনই অর্ডার করুন</span></button>
+    <button id="cpb-sticky-order" class="cpb-sticky-order" type="button" hidden><span aria-hidden="true">🛍️</span><span>এখনই অর্ডার করুন</span></button>
     <div id="cpb-store-toast" class="cpb-store-toast" role="status" aria-live="polite"></div>
 
-    <script src="{{ asset('public/frontEnd/js/jquery-3.6.3.min.js') }}"></script>
     <script src="{{ asset('public/frontEnd/js/campaign-page-renderer.js') }}"></script>
 </body>
 </html>
