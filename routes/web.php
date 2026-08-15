@@ -1155,3 +1155,20 @@ Route::get('dashboard', [DashboardController::class, 'dashboard'])->name('admin.
     Route::delete('refunds/{id}', [\App\Http\Controllers\Admin\RefundController::class, 'destroy'])->name('admin.refunds.destroy');
 
 });
+// ======================================================
+// 🤖 GEMINI ASSISTANT - Admin AI Helper
+// ======================================================
+Route::prefix('admin')->middleware(['auth:admin', 'admin'])->name('admin.')->group(function () {
+    Route::get('/gemini-assistant', [\App\Http\Controllers\Admin\GeminiAssistantController::class, 'index'])->name('gemini.index');
+    Route::get('/gemini-ai', [\App\Http\Controllers\Admin\GeminiAssistantController::class, 'index'])->name('gemini.ai');
+    Route::post('/gemini-ai/chat', [\App\Http\Controllers\Admin\GeminiAssistantController::class, 'chat'])->name('gemini.chat');
+    Route::post('/gemini-ai/clear', [\App\Http\Controllers\Admin\GeminiAssistantController::class, 'clearChat'])->name('gemini.clear');
+    Route::post('/gemini-ai/refresh', [\App\Http\Controllers\Admin\GeminiAssistantController::class, 'refreshData'])->name('gemini.refresh');
+    Route::get('/gemini-ai/context', [\App\Http\Controllers\Admin\GeminiAssistantController::class, 'getContext'])->name('gemini.context');
+    Route::get('/gemini-ai/quick-stats', [\App\Http\Controllers\Admin\GeminiAssistantController::class, 'quickStats'])->name('gemini.quick-stats');
+    Route::post('/gemini-ai/generate-description', [\App\Http\Controllers\Admin\GeminiAssistantController::class, 'generateProductDescription'])->name('gemini.generate_description');
+
+    Route::get('/gemini-ai/settings', [\App\Http\Controllers\Admin\GeminiAssistantController::class, 'settings'])->name('gemini.settings');
+    Route::post('/gemini-ai/settings', [\App\Http\Controllers\Admin\GeminiAssistantController::class, 'updateSettings'])->name('gemini.settings.update');
+    Route::post('/gemini-ai/settings/test', [\App\Http\Controllers\Admin\GeminiAssistantController::class, 'testSettings'])->name('gemini.settings.test');
+});
