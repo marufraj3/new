@@ -22,18 +22,18 @@
 
 @extends('frontEnd.layouts.master')
 
-@section('title', $seo->meta_title ?? ($generalsetting->name ?? 'Home'))
+@section('title', optional($seo)->meta_title ?? ($generalsetting->name ?? 'Home'))
 
 @push('seo')
 <meta name="app-url" content="{{ url('/') }}" />
 <meta name="robots" content="index, follow" />
-<meta name="description" content="{{ $seo->meta_description ?? '' }}" />
-<meta name="keywords" content="{{ $seo->meta_tags ?? '' }}" />
-<meta property="og:title" content="{{ $seo->meta_title ?? '' }}" />
+<meta name="description" content="{{ optional($seo)->meta_description ?? '' }}" />
+<meta name="keywords" content="{{ optional($seo)->meta_tags ?? '' }}" />
+<meta property="og:title" content="{{ optional($seo)->meta_title ?? '' }}" />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="{{ url()->current() }}" />
 <meta property="og:image" content="{{ asset($generalsetting->og_baner ?? 'public/logo.png') }}" />
-<meta property="og:description" content="{{ $seo->meta_description ?? '' }}" />
+<meta property="og:description" content="{{ optional($seo)->meta_description ?? '' }}" />
 @endpush
 
 @section('content')
@@ -476,12 +476,12 @@
 
 {{-- ---------- হিরো : বড় স্লাইডার + ডানপাশে ২টা ব্যানার ---------- --}}
 <div class="cd-wrap">
-    <div class="cd-hero">
+    <div class="cd-hero {{ collect($sliderbottomads ?? [])->take(2)->isEmpty() ? 'is-solo' : '' }}">
 
         <div class="cd-slider" id="cdSlider">
             <div class="cd-slides" id="cdSlides">
                 @forelse ($sliders as $s)
-                <a href="{{ $s->link ?: '#' }}"><img src="{{ asset($s->image) }}" alt="slider"></a>
+                <a href="{{ $s->link ?: '#' }}"><img src="{{ asset($s->image) }}" alt="slider" @if($loop->first) fetchpriority="high" @else loading="lazy" @endif></a>
                 @empty
                 <div><img src="{{ asset($generalsetting->og_baner ?? 'public/logo.png') }}" alt="slider"></div>
                 @endforelse
@@ -728,6 +728,48 @@
             <small>⭐ {{ $v->average_rating ?? 0 }} ({{ $v->total_reviews ?? 0 }}) • {{ $v->products_count ?? 0 }} Products</small>
             <span class="cd-visit">Visit Shop</span>
         </a>
+        @endforeach
+    </div>
+</div></section>
+@endif
+
+@if(isset($reviews) && $reviews->count())
+<section class="cd-sec"><div class="cd-wrap">
+    <div class="cd-head"><h2>Customer Reviews</h2></div>
+    <div class="cd-reviews">
+        @foreach($reviews as $review)
+        <a href="{{ $review->link ?: '#' }}"><img src="{{ asset($review->image) }}" alt="Customer review" loading="lazy"></a>
+        @endforeach
+    </div>
+</div></section>
+@endif
+
+@if(isset($blogs) && $blogs->count())
+<section class="cd-sec"><div class="cd-wrap">
+    <div class="cd-head">
+        <h2>Latest Blog</h2>
+        <a class="cd-viewall" href="{{ route('blogs') }}">View All</a>
+    </div>
+    <div class="cd-blogs">
+        @foreach($blogs as $blog)
+        <a class="cd-blog" href="{{ route('blog.details', $blog->slug) }}">
+            <img src="{{ $blog->image ? url('public/'.$blog->image) : asset('public/uploads/default.webp') }}" alt="{{ $blog->title }}" loading="lazy">
+            <div class="cd-blog-body">
+                <div class="cd-blog-meta">{{ optional($blog->created_at)->format('d M Y') }}</div>
+                <h3>{{ \Illuminate\Support\Str::limit($blog->title, 60) }}</h3>
+                <p>{{ \Illuminate\Support\Str::limit(strip_tags($blog->short_description ?? ''), 110) }}</p>
+            </div>
+        </a>
+        @endforeach
+    </div>
+</div></section>
+@endif
+
+@if(isset($footertopads) && $footertopads->count())
+<section class="cd-sec"><div class="cd-wrap">
+    <div class="cd-ads cd-ads-{{ min(4, $footertopads->count()) }}">
+        @foreach($footertopads as $ad)
+        <a href="{{ $ad->link ?: '#' }}"><img src="{{ asset($ad->image) }}" alt="Promo banner" loading="lazy"></a>
         @endforeach
     </div>
 </div></section>
@@ -1112,35 +1154,6 @@
         var t = document.createElement('div');
         t.textContent = msg;
         t.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:' + (err ? '#e11d48' : '#12a150') + ';color:#fff;padding:11px 22px;border-radius:30px;z-index:100000;font-size:13.5px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.2)';
-        document.body.appendChild(t);
-        setTimeout(function(){ t.remove(); }, 2300);
-    }
-
-    /* ---------- ৬. লাইভ পারচেজ নোটিফিকেশন ---------- */
-    var liveData = Object.keys(CDP).slice(0,10).map(function(k){ return { n: CDP[k].name.substring(0,34), i: CDP[k].img }; });
-    var cities = ['ঢাকা','চট্টগ্রাম','সিলেট','খুলনা','রাজশাহী','বরিশাল','রংপুর','ময়মনসিংহ','কুমিল্লা','নারায়ণগঞ্জ'];
-    var live = document.getElementById('cdLive');
-    if(liveData.length){
-        setInterval(function(){
-            var d = liveData[Math.floor(Math.random() * liveData.length)];
-            document.getElementById('cdLiveImg').src   = d.i;
-            document.getElementById('cdLiveName').textContent = d.n;
-            document.getElementById('cdLiveCity').textContent = cities[Math.floor(Math.random() * cities.length)];
-            live.classList.add('on');
-            setTimeout(function(){ live.classList.remove('on'); }, 5000);
-        }, 14000);
-    }
-
-    /* ---------- ৭. ব্যাক টু টপ ---------- */
-    var topBtn = document.getElementById('cdTop');
-    window.addEventListener('scroll', function(){
-        topBtn.classList.toggle('on', window.scrollY > 500);
-    }, {passive:true});
-
-})();
-</script>
-@endsection
-;z-index:100000;font-size:13.5px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.2)';
         document.body.appendChild(t);
         setTimeout(function(){ t.remove(); }, 2300);
     }

@@ -68,9 +68,8 @@ class FrontendController extends Controller
     public function index()
     {
         // ✅ Homepage cache (5 min) - reduces DB load on high traffic
-        $cacheKey = 'frontend_homepage_v2';
-        $cacheMinutes = 5;
-        $data = Cache::remember($cacheKey, $cacheMinutes * 60, function () {
+        $cacheKey = 'frontend_homepage_v3';
+        $data = Cache::remember($cacheKey, 300, function () {
             return $this->getHomepageData();
         });
         return view('frontEnd.layouts.pages.index', $data);
@@ -81,23 +80,24 @@ class FrontendController extends Controller
      */
     protected function getHomepageData()
     {
-        // General setting
-        $generalsetting = GeneralSetting::where('status', 1)->limit(1)->first();
+        $generalsetting = Cache::remember('general_setting', 1800, function () {
+            return GeneralSetting::where('status', 1)->first();
+        });
+        $seo = Cache::remember('seo_settings_row', 1800, fn () => DB::table('seo_settings')->first());
+        $menucategories = Cache::get('menu_categories_nav');
+        if (!$menucategories) {
+            $menucategories = Category::where('status', 1)
+                ->where('parent_id', 0)
+                ->select('id', 'name', 'slug', 'icon', 'image')
+                ->with(['subcategories.childcategories'])
+                ->orderBy('id', 'ASC')
+                ->get();
+        }
 
-        // SEO setting
-        $seo = DB::table('seo_settings')->first();
-
-        // Main menu categories (for header/sidebar)
-        $menucategories = Category::where('status', 1)
-            ->where('parent_id', 0)
-            ->select('id', 'name', 'slug', 'icon', 'image')
-            ->with(['subcategories.childcategories'])
-            ->orderBy('id', 'ASC')
-            ->get();
-
-        // Front categories (যদি অন্য কোথাও ব্যবহার হয়)
-        $frontcategory = Category::where(['status' => 1])
+        $frontcategory = Category::where(['status' => 1, 'parent_id' => 0])
             ->select('id', 'name', 'image', 'icon', 'slug', 'status')
+            ->orderBy('id', 'ASC')
+            ->limit(16)
             ->get();
 
         // Banners
@@ -1194,27 +1194,30 @@ $brands = Brand::where('status', 1)
 
         // Facebook CAPI ViewContent — server-side, event_id দিয়ে Pixel-এর সাথে deduplicate হবে
         $fb_view_content_event_id = 'vc_camp' . $campaign_data->id . '_' . time();
-        try {
-            $capiUserData = [
-                'client_ip_address' => request()->ip(),
-                'client_user_agent' => request()->userAgent(),
-            ];
-            if (isset($_COOKIE['_fbp'])) $capiUserData['fbp'] = $_COOKIE['_fbp'];
-            if (isset($_COOKIE['_fbc'])) $capiUserData['fbc'] = $_COOKIE['_fbc'];
-            app(\App\Services\FacebookCapiService::class)->sendViewContent([
-                'content_name' => strip_tags($campaign_data->name),
-                'content_ids'  => $products->pluck('id')->map(function($id) { return (string)$id; })->values()->toArray(),
-                'content_type' => 'product',
-                'value'        => (float) (optional($products->first())->new_price ?? 0),
-                'currency'     => 'BDT',
-                'num_items'    => $products->count(),
-            ], $capiUserData, [
-                'event_id'        => $fb_view_content_event_id,
-                'event_source_url' => request()->fullUrl(),
-            ]);
-        } catch (\Throwable $e) {
-            // Silently fail — page load block করবে না
-        }
+        $capiPayload = [
+            'content_name' => strip_tags($campaign_data->name),
+            'content_ids'  => $products->pluck('id')->map(fn ($id) => (string) $id)->values()->toArray(),
+            'content_type' => 'product',
+            'value'        => (float) (optional($products->first())->new_price ?? 0),
+            'currency'     => 'BDT',
+            'num_items'    => $products->count(),
+        ];
+        $capiUserData = [
+            'client_ip_address' => request()->ip(),
+            'client_user_agent' => request()->userAgent(),
+        ];
+        if (isset($_COOKIE['_fbp'])) $capiUserData['fbp'] = $_COOKIE['_fbp'];
+        if (isset($_COOKIE['_fbc'])) $capiUserData['fbc'] = $_COOKIE['_fbc'];
+        $capiUrl = request()->fullUrl();
+        dispatch(function () use ($capiPayload, $capiUserData, $fb_view_content_event_id, $capiUrl) {
+            try {
+                app(\App\Services\FacebookCapiService::class)->sendViewContent($capiPayload, $capiUserData, [
+                    'event_id' => $fb_view_content_event_id,
+                    'event_source_url' => $capiUrl,
+                ]);
+            } catch (\Throwable $e) {
+            }
+        })->afterResponse();
 
         $viewData = compact(
             'campaign_data',
