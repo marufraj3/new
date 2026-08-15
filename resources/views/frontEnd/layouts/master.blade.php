@@ -488,6 +488,105 @@
         </script>
         @endif
         <!-- ========== End TikTok Pixel ========== -->
+
+        {{-- ==================================================================
+             নতুন ডিজাইন থিম CSS — সব external css এর পরে লোড হচ্ছে,
+             তাই bootstrap / main.css / style.css কে override করবে।
+             ================================================================== --}}
+        <style>
+        :root{
+            --cd-primary  : {{ optional($generalsetting)->primary_color  ?? '#303d6e' }};
+            --cd-secondary: {{ optional($generalsetting)->secodery_color ?? '#ff0000' }};
+            --cd-nav      : #111111;
+            --cd-text     : #1f2937;
+            --cd-muted    : #6b7280;
+            --cd-line     : #e9edf2;
+            --cd-radius   : 12px;
+            --cd-shadow   : 0 2px 10px rgba(16,24,40,.06);
+            --cd-shadow-lg: 0 10px 30px rgba(16,24,40,.12);
+        }
+
+        /* ---------- পুরনো থিমের হেডার স্টাইল বন্ধ ---------- */
+        .cd-hd-wrap .logo-area,.cd-hd-wrap .menu-area{display:none!important;}
+
+        /* ---------- HEADER ---------- */
+        .cd-hd{background:#fff;border-bottom:1px solid #eee;}
+        .cd-hd-in{max-width:1240px;margin:0 auto;padding:12px 14px;display:flex;align-items:center;gap:16px;}
+        .cd-hd-logo img{height:52px;width:auto;object-fit:contain;}
+        .cd-hd-search{flex:1;max-width:620px;display:flex;position:relative;margin:0;}
+        .cd-hd-search input{flex:1;width:100%;height:46px;border:1px solid #dfe3e8;border-right:0;border-radius:8px 0 0 8px;padding:0 16px;font-size:14px;outline:none;background:#fff;}
+        .cd-hd-search input:focus{border-color:var(--cd-primary);}
+        .cd-hd-search button{width:56px;height:46px;border:0;background:#111;color:#fff;border-radius:0 8px 8px 0;cursor:pointer;font-size:15px;}
+        .cd-hd-search .search_result{position:absolute;top:50px;left:0;right:0;background:#fff;box-shadow:var(--cd-shadow-lg);border-radius:10px;z-index:120;max-height:340px;overflow:auto;}
+        .cd-hd-acts{margin-left:auto;display:flex;align-items:center;gap:10px;}
+        .cd-hd-cart{position:relative;display:flex;align-items:center;gap:7px;background:#111;color:#fff!important;border-radius:8px;padding:11px 15px;font-size:13px;font-weight:700;text-decoration:none!important;}
+        .cd-hd-cart b{position:absolute;top:-7px;right:-7px;background:var(--cd-secondary);color:#fff;width:20px;height:20px;border-radius:50%;font-size:11px;display:grid;place-items:center;}
+        .cd-hd-ico{width:42px;height:42px;border-radius:50%;border:1px solid #dfe3e8;display:grid;place-items:center;color:#111!important;font-size:15px;text-decoration:none!important;transition:.25s;}
+        .cd-hd-ico:hover{background:var(--cd-primary);color:#fff!important;border-color:var(--cd-primary);}
+        .cd-hd-track{background:#111;color:#fff!important;border-radius:8px;padding:12px 20px;font-size:13px;font-weight:700;text-decoration:none!important;white-space:nowrap;transition:.25s;}
+        .cd-hd-track:hover{background:var(--cd-primary);}
+
+        /* ---------- BLACK NAV ---------- */
+        .cd-nav-bar{background:var(--cd-nav);position:relative;z-index:70;}
+        .cd-nav-in{max-width:1240px;margin:0 auto;padding:0 14px;display:flex;align-items:center;justify-content:center;gap:2px;}
+        .cd-nav-item{position:relative;}
+        .cd-nav-item > a{display:flex;align-items:center;gap:6px;color:#fff!important;font-size:14px;font-weight:600;padding:14px 15px;white-space:nowrap;text-decoration:none!important;transition:.2s;}
+        .cd-nav-item > a:hover{color:var(--cd-secondary)!important;}
+        .cd-caret{font-size:10px;opacity:.85;}
+        .cd-drop,.cd-drop2{position:absolute;background:#fff;box-shadow:var(--cd-shadow-lg);list-style:none;margin:0;padding:8px 0;min-width:220px;display:none;z-index:90;}
+        .cd-drop{left:0;top:100%;border-radius:0 0 10px 10px;border-top:3px solid var(--cd-secondary);}
+        .cd-drop2{left:100%;top:0;border-radius:10px;min-width:200px;}
+        .cd-nav-item:hover > .cd-drop{display:block;}
+        .cd-drop > li{position:relative;}
+        .cd-drop > li:hover > .cd-drop2{display:block;}
+        .cd-drop a{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 16px;font-size:13.5px;color:var(--cd-text)!important;text-decoration:none!important;}
+        .cd-drop a:hover{background:#f5f7fa;color:var(--cd-primary)!important;}
+
+        /* ---------- মোবাইল হেডার (পুরনো markup, নতুন লুক) ---------- */
+        @media(max-width:991px){
+            .cd-hd,.cd-nav-bar{display:none!important;}
+            .mobile-header.sticky{background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.06);}
+            .mobile-search form{display:flex;padding:8px 10px;gap:0;}
+            .mobile-search input{flex:1;height:42px;border:1px solid #dfe3e8;border-right:0;border-radius:8px 0 0 8px;padding:0 14px;font-size:14px;}
+            .mobile-search button{width:52px;height:42px;border:0;background:#111;color:#fff;border-radius:0 8px 8px 0;}
+        }
+        @media(min-width:992px){
+            .mobile-header,.mobile-search{display:none!important;}
+        }
+
+        /* ==================================================================
+           হোমপেজ ডিজাইনের রেসপন্সিভ গ্যারান্টি (auto-fit গ্রিড)
+           ================================================================== */
+        .cd-home,.cd-home *{box-sizing:border-box!important;}
+        .cd-home ul{list-style:none!important;margin:0!important;padding:0!important;}
+        .cd-home h2,.cd-home h3,.cd-home h4,.cd-home h5,.cd-home p{margin:0;}
+        .cd-home img{max-width:100%;height:auto;}
+        .cd-wrap{max-width:1240px!important;margin:0 auto!important;padding:0 14px!important;width:100%!important;}
+
+        .cd-hero{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,420px)!important;gap:14px!important;}
+        .cd-hero-side{display:grid!important;grid-template-rows:1fr 1fr!important;gap:14px!important;}
+        .cd-pgrid{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(165px,1fr))!important;gap:12px!important;}
+        .cd-pscroll > .cd-card{flex:0 0 clamp(155px,44vw,206px)!important;}
+        .cd-ads{display:grid!important;gap:12px!important;}
+        .cd-ads-2,.cd-ads-3,.cd-ads-4{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))!important;}
+        .cd-brands{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))!important;gap:12px!important;}
+        .cd-shops{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(175px,1fr))!important;gap:12px!important;}
+        .cd-feat{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(235px,1fr))!important;gap:12px!important;}
+        .cd-modal-body{display:grid!important;grid-template-columns:minmax(0,230px) minmax(0,1fr)!important;gap:18px!important;}
+
+        @media(max-width:991px){
+            .cd-hero{grid-template-columns:1fr!important;}
+            .cd-hero-side{grid-template-columns:1fr 1fr!important;grid-template-rows:auto!important;}
+            .cd-nav{display:none!important;}
+        }
+        @media(max-width:575px){
+            .cd-hero-side{grid-template-columns:1fr!important;}
+            .cd-pgrid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))!important;gap:9px!important;}
+            .cd-modal-body{grid-template-columns:1fr!important;}
+            .cd-deal{flex-direction:column;align-items:flex-start!important;}
+            .cd-timer{margin-left:0!important;width:100%;justify-content:space-between;}
+        }
+        </style>
     </head>
     <body class="gotop">
         @foreach($gtm_code ?? [] as $gtm)
@@ -571,168 +670,89 @@
                 <div class="search_result"></div>
             </div>
 
-            <div class="main-header">
-                <!-- header to end -->
-                <div class="logo-area">
-                    <div class="container">
-                        <div class="row">
-                            <div class="col-sm-12">
-                                <div class="logo-header">
-                                    <div class="main-logo">
-                                        <a href="{{route('home')}}"><img src="{{asset($generalsetting->dark_logo)}}" alt="" /></a>
-                                    </div>
-                                    <div class="main-search">
-                                        <form action="{{route('search')}}">
-                                            <input type="text" placeholder="Search Product..." class="search_keyword search_click" name="keyword" />
-                                            <button>
-                                                <i data-feather="search"></i>
-                                            </button>
-                                        </form>
-                                        <div class="search_result"></div>
-                                    </div>
-                                    <div class="header-list-items">
-                                        <ul>
-                                            <li class="track_btn">
-                                                <a href="{{route('customer.order_track')}}"> <i class="fa fa-truck"></i>Track Order</a>
-                                            </li>
-                                           
+            {{-- ==========================================================
+                 নতুন হেডার (লোগো + সার্চ + কার্ট + Track Order)
+                 ========================================================== --}}
+            <div class="main-header cd-hd-wrap">
+                <div class="cd-hd">
+                    <div class="cd-hd-in">
 
-                                            <li class="cart-dialog" id="cart-qty">
-                                                <a href="{{route('customer.checkout')}}">
-                                                    <p class="margin-shopping">
-                                                        <i class="fa-solid fa-cart-shopping"></i>
-                                                        <span>{{Cart::instance('shopping')->count()}}</span>
-                                                    </p>
-                                                </a>
-                                                <div class="cshort-summary">
-                                                    <ul>
-                                                        @foreach(Cart::instance('shopping')->content() as $key=>$value)
-                                                        <li>
-                                                            <a href=""><img src="{{asset($value->options->image)}}" alt="" /></a>
-                                                        </li>
-                                                        <li><a href="">{{Str::limit($value->name, 30)}}</a></li>
-                                                        <li>Qty: {{$value->qty}}</li>
-                                                        <li>
-                                                            <p>৳{{$value->price}}</p>
-                                                            <button class="remove-cart cart_remove" data-id="{{$value->rowId}}"><i data-feather="x"></i></button>
-                                                        </li>
-                                                        @endforeach
-                                                    </ul>
-                                                    <p><strong>সর্বমোট : ৳{{$subtotal}}</strong></p>
-                                                    <a href="{{route('customer.checkout')}}" class="go_cart"> অর্ডার করুন </a>
-                                                </div>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </div>
+                        <a class="cd-hd-logo" href="{{ route('home') }}">
+                            <img src="{{ asset(optional($generalsetting)->dark_logo ?? 'public/logo.png') }}" alt="{{ optional($generalsetting)->name }}">
+                        </a>
+
+                        <form class="cd-hd-search" action="{{ route('search') }}">
+                            <input type="text" name="keyword" class="search_keyword search_click" placeholder="Search products..." autocomplete="off">
+                            <button type="submit" aria-label="Search"><i class="fa fa-search"></i></button>
+                            <div class="search_result"></div>
+                        </form>
+
+                        <div class="cd-hd-acts">
+
+                            <a class="cd-hd-cart" href="{{ route('customer.checkout') }}" id="cart-qty">
+                                <span class="cd-hd-cart-amt">৳{{ $subtotal }}</span>
+                                <i class="fa-solid fa-cart-shopping"></i>
+                                <b class="cart_count">{{ Cart::instance('shopping')->count() }}</b>
+                            </a>
+
+                            @if(Auth::guard('customer')->user())
+                                <a class="cd-hd-ico" href="{{ route('customer.account') }}" title="{{ Auth::guard('customer')->user()->name }}"><i class="fa-regular fa-user"></i></a>
+                            @elseif(($generalsetting?->vendor_enabled ?? 1) == 1 && Auth::guard('admin')->check() && Auth::guard('admin')->user()->hasRole('vendor'))
+                                <a class="cd-hd-ico" href="{{ route('vendor.dashboard') }}" title="Vendor Panel"><i class="fa-solid fa-store"></i></a>
+                            @elseif(($generalsetting?->reseller_enabled ?? 1) == 1 && Auth::guard('admin')->check() && Auth::guard('admin')->user()->hasRole('reseller'))
+                                <a class="cd-hd-ico" href="{{ route('reseller.dashboard') }}" title="Reseller"><i class="fa-solid fa-handshake"></i></a>
+                            @else
+                                <a class="cd-hd-ico" href="{{ route('customer.login') }}" title="Login / Sign Up"><i class="fa-regular fa-user"></i></a>
+                            @endif
+
+                            <a class="cd-hd-track" href="{{ route('customer.order_track') }}">Track Order</a>
                         </div>
+
                     </div>
                 </div>
 
-                <div class="menu-area">
-                    <div class="container">
-                        <div class="row">
-                            <div class="col-sm-12">
-                                <div class="catagory_menu">
-                                    <ul class="heder__category">
-                                        <div>
-                                            <li class="all__category__list">
-                                                <a href="#">ALL CATEGORIES <i class="fa-solid fa-list"></i>
-                                                </a>
-                                                @if(Request::is('/'))
-                                                <div></div>
-                                                @else
-                                                <div class="sidebar-menu side__bar">
-                                                    <ul class="hideshow">
-                                                        @foreach ($menucategories as $key => $category)
-                                                            <li>
-                                                                <a href="{{ route('category', $category->slug) }}">
-                                                                    <img src="{{ asset($category->image) }}" alt="" />
-                                                                    {{ $category->name }}
-                                                                    <i class="fa-solid fa-chevron-right"></i>
-                                                                </a>
-                                                                <ul class="sidebar-submenu side__barsub">
-                                                                    @foreach ($category->subcategories as $key => $subcategory)
-                                                                        <li>
-                                                                            <a href="{{ route('subcategory', $subcategory->slug) }}">
-                                                                                {{ $subcategory->subcategoryName }} <i
-                                                                                    class="fa-solid fa-chevron-right"></i> </a>
-                                                                            <ul class="sidebar-childmenu side__barchild">
-                                                                                @foreach ($subcategory->childcategories as $key => $childcat)
-                                                                                    <li>
-                                                                                        <a href="{{ route('products', $childcat->slug) }}">
-                                                                                            {{ $childcat->childcategoryName }}
-                                                                                        </a>
-                                                                                    </li>
-                                                                                @endforeach
-                                                                            </ul>
-                                                                        </li>
-                                                                    @endforeach
-                                                                </ul>
-                                                            </li>
-                                                        @endforeach
-                                                    </ul>
-                                                </div>
-                                                @endif
-                                           </li> 
-                                        </div>
+                {{-- ==========================================================
+                     কালো ক্যাটাগরি মেনু বার (hover ড্রপডাউন)
+                     ========================================================== --}}
+                <nav class="cd-nav-bar">
+                    <div class="cd-nav-in">
+                        <div class="cd-nav-item"><a href="{{ route('home') }}">Home</a></div>
 
-
-                                        <div> <li><a href="{{route('home')}}">Home</a></li></div>
-                                        @if(($generalsetting?->vendor_enabled ?? 1) == 1)
-                                        <div><li><a href="{{route('sellers')}}">Sellers</a></li></div>
-                                        @endif
-										
-
-                                        <div class="contact__menu"><li><a href="{{route('contact')}}">Contact</a></li></div>
-                                       <div class="right__menu__top">
-                                            @if(Auth::guard('customer')->user())
-                                            <li class="for_order">
-                                                <p>
-                                                    <a href="{{route('customer.account')}}">
-                                                        <i class="fa-regular fa-user"></i>
-                                                        {{Str::limit(Auth::guard('customer')->user()->name,14)}}
-                                                    </a>
-                                                </p>
-                                            </li>
-                                            @elseif(($generalsetting?->vendor_enabled ?? 1) == 1 && Auth::guard('admin')->check() && Auth::guard('admin')->user()->hasRole('vendor'))
-                                            <li class="for_order">
-                                                <p>
-                                                    <a href="{{route('vendor.dashboard')}}">
-                                                        <i class="fa-solid fa-store"></i>
-                                                   Vendor Panel
-                                                    </a>
-                                                </p>
-                                            </li>
-                                            @elseif(($generalsetting?->reseller_enabled ?? 1) == 1 && Auth::guard('admin')->check() && (Auth::guard('admin')->user()->hasRole('reseller') || (isset(Auth::guard('admin')->user()->role) && strtolower(Auth::guard('admin')->user()->role) === 'reseller')))
-                                            <li class="for_order">
-                                                <p>
-                                                    <a href="{{route('reseller.dashboard')}}">
-                                                        <i class="fa-solid fa-handshake"></i>
-                                                Dashboard
-                                                    </a>
-                                                </p>
-                                            </li>
-                                            @else
-                                            <li class="for_order">
-                                                <p>
-                                                    <a href="{{route('customer.login')}}">
-                                                        <i class="fa-regular fa-user"></i>
-                                                        Login / Sign Up
-                                                    </a>
-                                                </p>
-                                            </li>
-                                            @endif
-                                       </div>
+                        @foreach (($menucategories ?? []) as $category)
+                        <div class="cd-nav-item">
+                            <a href="{{ route('category', $category->slug) }}">
+                                {{ $category->name }}
+                                @if($category->subcategories && $category->subcategories->count())<span class="cd-caret">▾</span>@endif
+                            </a>
+                            @if($category->subcategories && $category->subcategories->count())
+                            <ul class="cd-drop">
+                                @foreach ($category->subcategories as $sub)
+                                <li>
+                                    <a href="{{ route('subcategory', $sub->slug) }}">
+                                        {{ $sub->subcategoryName }}
+                                        @if($sub->childcategories && $sub->childcategories->count())<span class="cd-caret">›</span>@endif
+                                    </a>
+                                    @if($sub->childcategories && $sub->childcategories->count())
+                                    <ul class="cd-drop2">
+                                        @foreach ($sub->childcategories as $child)
+                                        <li><a href="{{ route('products', $child->slug) }}">{{ $child->childcategoryName }}</a></li>
+                                        @endforeach
                                     </ul>
-                                </div>
-                            </div>
+                                    @endif
+                                </li>
+                                @endforeach
+                            </ul>
+                            @endif
                         </div>
+                        @endforeach
+
+                        @if(($generalsetting?->vendor_enabled ?? 1) == 1)
+                        <div class="cd-nav-item"><a href="{{ route('sellers') }}">Sellers</a></div>
+                        @endif
+                        <div class="cd-nav-item"><a href="{{ route('contact') }}">Contact</a></div>
                     </div>
-                </div>
+                </nav>
             </div>
-            <!-- main-header end -->
         </header>
         <div id="content">
             @yield('content')
