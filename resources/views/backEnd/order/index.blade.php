@@ -68,7 +68,8 @@
                                     <th style="width:8%;">IP</th>
                                     <th style="width:10%;">Order Note</th>
                                     <th style="width:10%;">Admin Note</th>
-                                    <th style="width:10%;">Amount</th>
+                                    <th style="width:10%;">Amount / Paid</th>
+                                    <th style="width:8%;">UTM Source</th>
                                     <th style="width:10%;">Status</th>
                                     <th style="width:12%;">Courier</th>
                                     <th>Track</th>
@@ -82,7 +83,8 @@
                                         <td>{{ $loop->iteration }}</td>
                                         <td>
                                             <div class="button-list custom-btn-list">
-                                                <a href="{{ route('admin.order.invoice', ['invoice_id' => $value->invoice_id]) }}" title="Invoice"><i class="fe-eye"></i></a>
+                                                <button type="button" class="btn btn-link p-0 quick-order-view" data-url="{{ route('admin.order.quick_view', ['invoice_id' => $value->invoice_id]) }}" title="View details"><i class="fe-eye"></i></button>
+                                                <a href="{{ route('admin.order.invoice', ['invoice_id' => $value->invoice_id]) }}" title="Invoice"><i class="fe-file-text"></i></a>
                                                 <a href="{{ route('admin.order.process', ['invoice_id' => $value->invoice_id]) }}" title="Process"><i class="fe-settings"></i></a>
                                                 <a href="{{ route('admin.order.edit', ['invoice_id' => $value->invoice_id]) }}" title="Edit"><i class="fe-edit"></i></a>
                                                 <form method="post" action="{{ route('admin.order.destroy') }}" class="d-inline">
@@ -213,17 +215,22 @@
                                         {{-- Amount (show remaining if partial paid) --}}
                                         <td>
                                             @php
-                                                $payment = \App\Models\Payment::where('order_id', $value->id)->first();
-                                                $paid = $payment ? floatval($payment->amount) : 0;
-                                                $total = floatval($value->amount);
-                                                $showAmount = $total;
-                                                if ($paid > 0 && $paid < $total) {
-                                                    $showAmount = $total - $paid;
-                                                }
+                                                $paid = (float) ($value->paid_amount ?? optional($value->payment)->amount ?? 0);
+                                                $total = (float) $value->amount;
+                                                $due = max(0, $total - $paid);
                                             @endphp
-                                            ৳{{ number_format($showAmount, 2) }}
+                                            <strong>৳{{ number_format($due, 2) }}</strong>
+                                            <small class="d-block text-success">Paid: ৳{{ number_format($paid, 2) }}</small>
                                         </td>
 
+                                        <td>
+                                            @if($value->utm_source)
+                                                <span class="badge bg-light text-primary">{{ $value->utm_source }}</span>
+                                                @if($value->utm_campaign)<small class="d-block text-muted">{{ Str::limit($value->utm_campaign, 18) }}</small>@endif
+                                            @else
+                                                <span class="text-muted">-</span>
+                                            @endif
+                                        </td>
                                         <td>{{ $value->status ? $value->status->name : '' }}</td>
 
                                         {{-- Courier Information --}}
@@ -505,6 +512,20 @@
     </div>
 </div>
 
+<div class="modal fade" id="quickOrderModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fe-eye me-1"></i> Order Details <span id="quickOrderInvoice"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="quickOrderBody">
+                <div class="text-center p-5"><div class="spinner-border text-primary"></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     // Safe number helper
     function toNum(v) {
@@ -658,6 +679,34 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
 $(document).ready(function(){
+
+    // Fast order details popup: one small JSON request instead of opening a full page.
+    $(document).on('click', '.quick-order-view', function () {
+        var url = $(this).data('url');
+        $('#quickOrderBody').html('<div class="text-center p-5"><div class="spinner-border text-primary"></div></div>');
+        $('#quickOrderModal').modal('show');
+        $.get(url, function (o) {
+            $('#quickOrderInvoice').text('#' + o.invoice_id);
+            var rows = (o.items || []).map(function (item) {
+                return '<tr><td>' + $('<div>').text(item.name || '').html() + '</td>' +
+                    '<td>' + $('<div>').text(item.color || '-').html() + '</td>' +
+                    '<td>' + $('<div>').text(item.size || '-').html() + '</td>' +
+                    '<td>' + item.qty + '</td><td>৳' + Number(item.price || 0).toFixed(2) + '</td></tr>';
+            }).join('');
+            var esc = function (v) { return $('<div>').text(v || '-').html(); };
+            var paid = Number(o.paid || 0), total = Number(o.amount || 0);
+            $('#quickOrderBody').html(
+                '<div class="row g-3 mb-3">' +
+                '<div class="col-md-6"><div class="border rounded p-3"><h6>Customer</h6><strong>' + esc(o.customer) + '</strong><br>' + esc(o.phone) + '<br>' + esc(o.address) + '</div></div>' +
+                '<div class="col-md-6"><div class="border rounded p-3"><h6>Order Info</h6>Date: ' + esc(o.date) + '<br>Status: <b>' + esc(o.status) + '</b><br>Payment: ' + esc(o.payment_method) + '</div></div>' +
+                '</div><div class="table-responsive"><table class="table table-sm table-bordered"><thead><tr><th>Product</th><th>Color</th><th>Size</th><th>Qty</th><th>Price</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+                '<div class="row text-end"><div class="col-md-6 ms-auto"><div>Discount: ৳' + Number(o.discount || 0).toFixed(2) + '</div><div>Shipping: ৳' + Number(o.shipping_charge || 0).toFixed(2) + '</div><div class="text-success">Paid: ৳' + paid.toFixed(2) + '</div><strong class="text-primary">Total: ৳' + total.toFixed(2) + ' | Due: ৳' + Math.max(0, total - paid).toFixed(2) + '</strong></div></div>' +
+                '<hr><small class="text-muted">UTM Source: ' + esc(o.utm_source) + ' | Medium: ' + esc(o.utm_medium) + ' | Campaign: ' + esc(o.utm_campaign) + '</small>'
+            );
+        }).fail(function () {
+            $('#quickOrderBody').html('<div class="alert alert-danger">Order details load করা যায়নি।</div>');
+        });
+    });
 
     // Order Note / Admin Note popup open
     $(document).on('click', '.note-modal-btn', function (e) {

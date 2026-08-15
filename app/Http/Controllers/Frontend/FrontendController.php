@@ -318,8 +318,16 @@ $brands = Brand::where('status', 1)
 
         $product = Product::with('image')->findOrFail($request->id);
 
-        // 1) প্রোডাক্টের স্টক বের করি
-        $availableStock = $this->getAvailableStock($product);
+        // Variant stock is authoritative when a size/color is selected.
+        $selectedVariant = ProductVariantPrice::where('product_id', $product->id)
+            ->when($request->product_color, fn ($q) => $q->where('color_id', $request->product_color))
+            ->when($request->product_size, fn ($q) => $q->where('size_id', $request->product_size))
+            ->first();
+
+        // 1) Product stock, overridden by the selected size/color stock
+        $availableStock = $selectedVariant && $selectedVariant->stock !== null
+            ? (int) $selectedVariant->stock
+            : $this->getAvailableStock($product);
         $requestedQty   = max(1, (int)($request->qty ?? 1));
 
         // যদি স্টকের কোন কলামই না থাকে (stock/qty/quantity নেই), তখন স্টক চেক স্কিপ করবে
