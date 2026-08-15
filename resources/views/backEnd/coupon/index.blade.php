@@ -99,8 +99,9 @@
                         <th width="15%">Discount Type</th>
                         <th width="10%">Value</th>
                         <th width="15%">Min Purchase</th>
-                        <th width="20%">Validity Period</th>
-                        <th width="10%">Status</th>
+                        <th width="15%">Validity Period</th>
+                        <th width="12%">ব্যবহার</th>
+                        <th width="8%">Status</th>
                         <th width="10%" class="text-end">Actions</th>
                     </tr>
                 </thead>
@@ -157,6 +158,30 @@
                                 </div>
                             </td>
 
+                            {{-- ⭐ ব্যবহারের হিসাব --}}
+                            <td>
+                                @php
+                                    $used  = (int) ($coupon->used_count ?? 0);
+                                    $limit = (int) ($coupon->usage_limit ?? 0);
+                                    $exhausted = $limit > 0 && $used >= $limit;
+                                @endphp
+                                <div class="d-flex flex-column small">
+                                    <span class="{{ $exhausted ? 'text-danger fw-bold' : 'text-dark' }}">
+                                        {{ $used }}{{ $limit > 0 ? ' / ' . $limit : '' }} বার
+                                    </span>
+                                    @if($limit < 1)
+                                        <span class="text-muted" style="font-size:11px;">সীমাহীন</span>
+                                    @elseif($exhausted)
+                                        <span class="text-danger" style="font-size:11px;">সীমা শেষ</span>
+                                    @endif
+                                    @if($coupon->usage_limit_per_customer)
+                                        <span class="text-muted" style="font-size:11px;">
+                                            প্রতি জনে {{ (int) $coupon->usage_limit_per_customer }} বার
+                                        </span>
+                                    @endif
+                                </div>
+                            </td>
+
                             {{-- Status --}}
                             <td>
                                 @php
@@ -192,7 +217,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center py-5">
+                            <td colspan="9" class="text-center py-5">
                                 <img src="https://cdn-icons-png.flaticon.com/512/7486/7486744.png" width="60" class="mb-3 opacity-25">
                                 <p class="text-muted fw-bold mb-0">No Coupons Found</p>
                                 <small class="text-muted">Create a new coupon to get started.</small>

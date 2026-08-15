@@ -144,9 +144,48 @@
                 </div>
                 
                 <div class="card-body p-4">
-                    
+
+                    <div class="alert alert-info d-flex gap-2 align-items-start mb-4" role="alert">
+                        <i class="fe-info mt-1"></i>
+                        <div>
+                            <strong>সংস্করণ ২ — এখন শুধু ফোন নম্বর দিয়ে গণনা হয়।</strong>
+                            <div class="small mt-1">
+                                আগে ফোন নম্বরের পাশাপাশি IP ঠিকানা দিয়েও গণনা হতো। মোবাইল ডেটা (CGNAT)
+                                বা অফিস/হোস্টেলের শেয়ার্ড ওয়াইফাইয়ে একাধিক আলাদা কাস্টমার একই IP থেকে আসায়
+                                নির্দোষ অর্ডারও আটকে যেত — সেই অংশটি বাদ দেওয়া হয়েছে।
+                                বাতিল হওয়া অর্ডার সীমার হিসাবে ধরা হয় না, এবং
+                                হোয়াইটলিস্ট করা নম্বর কখনোই আটকাবে না।
+                            </div>
+                        </div>
+                    </div>
+
                     <form action="{{ route('admin.order.restriction.setting.update') }}" method="POST">
                         @csrf
+
+                        {{-- মাস্টার সুইচ — এটি চালু না করলে কোনো অর্ডার আটকানো হবে না --}}
+                        <div class="mb-4 p-3 rounded" style="background:#f8f9fc;border:1px solid #e2e8f0;">
+                            @if ($hasSwitch)
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch"
+                                           id="order_limit_enabled" name="order_limit_enabled" value="1"
+                                           {{ old('order_limit_enabled', $data->order_limit_enabled ?? false) ? 'checked' : '' }}>
+                                    <label class="form-check-label fw-bold text-dark" for="order_limit_enabled">
+                                        অর্ডার সীমা চালু করুন
+                                    </label>
+                                </div>
+                                <small class="text-muted d-block mt-2">
+                                    বন্ধ থাকলে নিচের সীমাগুলো শুধু সেভ থাকবে, চেকআউটে কোনো অর্ডার আটকানো হবে না।
+                                    নতুন দোকানে এটি বন্ধ রাখাই নিরাপদ।
+                                </small>
+                            @else
+                                <div class="text-danger small">
+                                    <strong>মাইগ্রেশন বাকি আছে।</strong>
+                                    <code>order_limit_enabled</code> কলামটি তৈরি না হওয়া পর্যন্ত ফিচারটি বন্ধ থাকবে।
+                                    সার্ভারে <code>php artisan migrate</code> চালান।
+                                </div>
+                            @endif
+                        </div>
+
                         
                         <div class="mb-4">
                             <label class="form-label fw-bold text-dark mb-2">Order Restriction Time <span class="text-danger">*</span></label>
@@ -228,10 +267,108 @@
                             নতুন অর্ডারগুলো এই নিয়ম অনুসরণ করবে।
                         </small>
                     </div>
+
+                    <div class="mt-3">
+                        <h6 class="fw-bold text-dark mb-2">🔔 বর্তমান অবস্থা</h6>
+                        @if ($hasSwitch && ($data->order_limit_enabled ?? false))
+                            <span class="badge bg-success">চালু আছে</span>
+                            <small class="text-muted d-block mt-1">চেকআউটে সীমা প্রয়োগ হচ্ছে।</small>
+                        @else
+                            <span class="badge bg-secondary">বন্ধ আছে</span>
+                            <small class="text-muted d-block mt-1">কোনো অর্ডার আটকানো হচ্ছে না।</small>
+                        @endif
+                    </div>
                 </div>
             </div>
         </div>
 
+    </div>
+
+    {{-- ⭐ হোয়াইটলিস্ট — এই নম্বরগুলোর ওপর কোনো সীমা প্রযোজ্য নয় --}}
+    <div class="row justify-content-center">
+        <div class="col-lg-11">
+            <div class="card settings-card mb-4">
+                <div class="settings-card-header">
+                    <i class="fe-user-check me-2 text-success"></i> হোয়াইটলিস্ট — সীমার আওতামুক্ত নম্বর
+                </div>
+                <div class="card-body p-4">
+
+                    <p class="text-muted small">
+                        রিসেলার, পাইকারি ক্রেতা বা নিজেদের টেস্ট নম্বর এখানে যোগ করুন।
+                        এই নম্বরগুলো যতবার খুশি অর্ডার করতে পারবে — সীমা তাদের ওপর প্রযোজ্য হবে না।
+                    </p>
+
+                    @if (!$hasWhitelistTable)
+                        <div class="alert alert-danger">
+                            হোয়াইটলিস্ট টেবিলটি এখনো তৈরি হয়নি। সার্ভারে <code>php artisan migrate</code> চালান।
+                        </div>
+                    @else
+                        <form action="{{ route('admin.order.restriction.whitelist.store') }}" method="POST" class="row g-2 align-items-end mb-4">
+                            @csrf
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold small">ফোন নম্বর <span class="text-danger">*</span></label>
+                                <input type="text" name="phone" class="form-control" placeholder="01XXXXXXXXX" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold small">নাম</label>
+                                <input type="text" name="name" class="form-control" placeholder="যেমন: করিম রিসেলার">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small">নোট</label>
+                                <input type="text" name="note" class="form-control" placeholder="কেন ছাড় দেওয়া হচ্ছে">
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn btn-success w-100">যোগ করুন</button>
+                            </div>
+                        </form>
+
+                        <div class="table-responsive">
+                            <table class="table table-bordered align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>ফোন নম্বর</th>
+                                        <th>নাম</th>
+                                        <th>নোট</th>
+                                        <th>যোগ হয়েছে</th>
+                                        <th style="width:110px;">ব্যবস্থা</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                @forelse ($whitelist as $row)
+                                    <tr>
+                                        <td><strong>{{ $row->phone }}</strong></td>
+                                        <td>{{ $row->name ?: '—' }}</td>
+                                        <td>{{ $row->note ?: '—' }}</td>
+                                        <td>{{ $row->created_at ? $row->created_at->format('d M, Y') : '—' }}</td>
+                                        <td>
+                                            <form action="{{ route('admin.order.restriction.whitelist.destroy', $row->id) }}"
+                                                  method="POST"
+                                                  onsubmit="return confirm('নম্বরটি হোয়াইটলিস্ট থেকে সরাবেন?')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">সরান</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted py-4">
+                                            হোয়াইটলিস্টে এখনো কোনো নম্বর নেই।
+                                        </td>
+                                    </tr>
+                                @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+
+                        @if (method_exists($whitelist, 'links'))
+                            {{ $whitelist->links() }}
+                        @endif
+                    @endif
+
+                </div>
+            </div>
+        </div>
     </div>
 </div> 
 

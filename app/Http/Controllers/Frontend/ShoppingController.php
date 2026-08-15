@@ -149,52 +149,115 @@ class ShoppingController extends Controller
     // 🟢 Apply coupon
     public function applyCoupon(Request $request)
     {
-        $request->validate(['coupon_code' => 'required']);
+        $request->validate([
+            'coupon_code' => 'required',
+            'phone'       => 'nullable|string|max:30',
+        ]);
 
-        $coupon = Coupon::where('code', $request->coupon_code)
-            ->where('status', 1)
-            ->first();
+        // ⭐ কুপনের "প্রতি কাস্টমার সর্বোচ্চ কতবার" সীমা ফোন নম্বর দিয়ে গোনা হয়।
+        // চেকআউট ফর্মে ফোন লেখা থাকলে সেটি পাঠানো হয়; না থাকলে লগইন করা
+        // কাস্টমারের নম্বর ব্যবহার করি। কোনোটিই না থাকলে শুধু মোট সীমা প্রযোজ্য
+        // হবে — অর্ডার সেভের সময় আসল ফোন দিয়ে আবার যাচাই করা হয়।
+        $phone = $request->input('phone');
 
-        if (!$coupon) {
-            Toastr::error('Invalid Coupon Code', 'Error');
-            return redirect()->back();
+        if (!$phone && auth()->guard('web')->check()) {
+            $phone = auth()->guard('web')->user()->phone ?? null;
         }
 
-        $today = Carbon::now()->format('Y-m-d');
+        $result = app(\App\Services\CouponService::class)->apply($request->coupon_code, $phone);
 
-        if (($coupon->valid_from && $today < $coupon->valid_from) ||
-            ($coupon->valid_to && $today > $coupon->valid_to)) {
-            Toastr::error('Coupon expired or not valid yet', 'Error');
-            return redirect()->back();
+        // ক্যাম্পেইন/বিল্ডার পেজ কোনো রিলোড করে না — সেখান থেকে আসা রিকোয়েস্টে
+        // JSON + রিফ্রেশ করা কার্ট HTML দুটোই ফেরত দিই, যাতে এক রাউন্ডট্রিপেই
+        // টোটাল আপডেট হয়ে যায়।
+        if ($this->wantsJson($request)) {
+            return response()->json($result + [
+                'cart_html' => $this->renderCartPartial(),
+            ], $result['ok'] ? 200 : 422);
         }
 
-        // subtotal() returns string like “1,200.00”
-        $subtotal = floatval(
-            preg_replace('/[^\d.]/', '', Cart::instance('shopping')->subtotal())
-        );
+        $result['ok']
+            ? Toastr::success($result['message'], 'Success')
+            : Toastr::error($result['message'], 'Error');
 
-        if ($coupon->min_purchase && $subtotal < $coupon->min_purchase) {
-            Toastr::error("Minimum purchase ৳{$coupon->min_purchase} required", 'Error');
-            return redirect()->back();
-        }
-
-        $discount = $coupon->type == 'percent'
-            ? ($subtotal * ($coupon->value / 100))
-            : $coupon->value;
-
-        Session::put('coupon_code', $coupon->code);
-        Session::put('discount', round($discount, 2));
-
-        Toastr::success("Coupon Applied! You saved ৳" . round($discount, 2), 'Success');
         return redirect()->back();
     }
 
     // 🟢 Remove coupon
-    public function removeCoupon()
+    public function removeCoupon(Request $request)
     {
-        Session::forget(['coupon_code', 'discount']);
-        Toastr::success('Coupon removed successfully', 'Success');
+        $result = app(\App\Services\CouponService::class)->remove();
+
+        if ($this->wantsJson($request)) {
+            return response()->json($result + [
+                'cart_html' => $this->renderCartPartial(),
+            ]);
+        }
+
+        Toastr::success($result['message'], 'Success');
         return redirect()->back();
+    }
+
+    /**
+     * ⭐ অর্ডার বাম্প — চেকআউটে দেখানো অ্যাড-অন অফার কার্টে যোগ করে।
+     */
+    public function addOrderBump(Request $request)
+    {
+        $request->validate(['bump_id' => 'required|integer']);
+
+        $result = app(\App\Services\OrderBumpService::class)
+            ->addToCart((int) $request->bump_id);
+
+        if ($this->wantsJson($request)) {
+            // বাম্প যোগ হলে কার্টের অঙ্ক বদলায়, তাই কুপনটাও আবার যাচাই করি।
+            app(\App\Services\CouponService::class)->revalidate();
+
+            return response()->json($result + [
+                'cart_html' => $this->renderCartPartial(),
+            ], $result['ok'] ? 200 : 422);
+        }
+
+        $result['ok']
+            ? Toastr::success($result['message'], 'Success')
+            : Toastr::error($result['message'], 'Error');
+
+        return redirect()->back();
+    }
+
+    /**
+     * ক্যাম্পেইন পেজের fetch() কল JSON চায়; সাধারণ চেকআউটের ফর্ম সাবমিট চায় redirect।
+     */
+    protected function wantsJson(Request $request): bool
+    {
+        return $request->boolean('campaign')
+            || $request->header('X-Campaign-Page')
+            || $request->expectsJson();
+    }
+
+    /**
+     * বর্তমান কার্টের HTML স্ট্রিং — AJAX রেসপন্সে সরাসরি বসিয়ে দেওয়ার জন্য।
+     */
+    protected function renderCartPartial(): string
+    {
+        $data = Cart::instance('shopping')->content();
+
+        return view(self::cartPartial(), compact('data'))->render();
+    }
+
+    /**
+     * কার্ট বদলানোর পর সবসময় এই রেসপন্সটাই ফেরত যায়।
+     *
+     * এখানে কুপন revalidate করা জরুরি: qty কমিয়ে min_purchase এর নিচে নামলে
+     * কুপনটা আর বৈধ থাকে না, আবার percent কুপনে টাকার অঙ্ক বদলে যায়।
+     * আগে এটা কোথাও হতো না, ফলে সেশনে বসে থাকা পুরনো discount টি
+     * order_save() পর্যন্ত চলে যেত।
+     */
+    protected function cartResponse()
+    {
+        app(\App\Services\CouponService::class)->revalidate();
+
+        $data = Cart::instance('shopping')->content();
+
+        return view(self::cartPartial(), compact('data'));
     }
 
     // 🟢 Add to cart (POST) with variant support
@@ -278,6 +341,11 @@ class ShoppingController extends Controller
         ]);
 
         Toastr::success('Product added to cart successfully!', 'Success');
+
+        // ⭐ ক্যাম্পেইন পেজ থেকে কার্টে যোগ হলে সেটা গোনা হয় (funnel: ভিজিট → কার্ট → অর্ডার)
+        if ($campaignId = Session::get('active_campaign_id')) {
+            app(\App\Services\CampaignAnalyticsService::class)->recordAddToCart($campaignId);
+        }
 
         // যদি ফর্ম থেকে "order_now" ক্লিক করা হয়ে থাকে, সরাসরি checkout
         if ($request->has('order_now')) {
@@ -366,16 +434,14 @@ class ShoppingController extends Controller
             ],
         ]);
 
-        $data = Cart::instance('shopping')->content();
-        return view(self::cartPartial(), compact('data'));
+        return $this->cartResponse();
     }
 
     // 🟢 Remove from cart
     public function cart_remove(Request $request)
     {
         Cart::instance('shopping')->update($request->id, 0);
-        $data = Cart::instance('shopping')->content();
-        return view(self::cartPartial(), compact('data'));
+        return $this->cartResponse();
     }
 
     // 🟢 Increment quantity
@@ -397,8 +463,7 @@ class ShoppingController extends Controller
 
         Cart::instance('shopping')->update($request->id, $qty);
 
-        $data = Cart::instance('shopping')->content();
-        return view(self::cartPartial(), compact('data'));
+        return $this->cartResponse();
     }
 
     // 🟢 Decrement quantity
@@ -412,8 +477,7 @@ class ShoppingController extends Controller
 
         Cart::instance('shopping')->update($request->id, $qty);
 
-        $data = Cart::instance('shopping')->content();
-        return view(self::cartPartial(), compact('data'));
+        return $this->cartResponse();
     }
 
     // 🟢 Cart count (header)
@@ -523,8 +587,7 @@ class ShoppingController extends Controller
             ],
         ]);
 
-        $data = Cart::instance('shopping')->content();
-        return view(self::cartPartial(), compact('data'));
+        return $this->cartResponse();
     }
 
     /**

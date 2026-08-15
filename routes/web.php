@@ -134,6 +134,10 @@ Route::prefix('admin')
         // Order Restriction Settings
         Route::get('/order-restriction-settings', [App\Http\Controllers\Admin\OrderRestrictionSettingController::class, 'index'])->name('order.restriction.setting.index');
         Route::post('/order-restriction-settings/update', [App\Http\Controllers\Admin\OrderRestrictionSettingController::class, 'update'])->name('order.restriction.setting.update');
+
+        // ⭐ v2 — হোয়াইটলিস্ট (এই নম্বরগুলোর ওপর কোনো অর্ডার সীমা প্রযোজ্য নয়)
+        Route::post('/order-restriction-settings/whitelist', [App\Http\Controllers\Admin\OrderRestrictionSettingController::class, 'storeWhitelist'])->name('order.restriction.whitelist.store');
+        Route::delete('/order-restriction-settings/whitelist/{id}', [App\Http\Controllers\Admin\OrderRestrictionSettingController::class, 'destroyWhitelist'])->name('order.restriction.whitelist.destroy');
     });
 
 
@@ -142,9 +146,14 @@ Route::prefix('admin')->middleware(['auth:admin', 'admin', 'demo_mode'])->group(
     Route::post('/sitemap/generate', [SitemapController::class, 'generate'])->name('admin.sitemap.generate');
 });
 
-Route::post('/incomplete-order/store', 
-    [\App\Http\Controllers\Admin\IncompleteOrderController::class, 'store']
-)->middleware(['auth:admin', 'admin', 'demo_mode'])->name('incomplete.order.store');
+/*
+ * অ্যাবানডনড কার্ট ক্যাপচার — এটি কাস্টমার চেকআউট/ল্যান্ডিং পেজ থেকে কল হয়,
+ * তাই কোনো admin auth থাকতে পারবে না (আগে ['auth:admin','admin'] থাকায় প্রতিটি
+ * রিকোয়েস্ট ফেল করত)। স্প্যাম ঠেকাতে throttle দেওয়া হলো।
+ */
+Route::post('/incomplete-order/store', [\App\Http\Controllers\Frontend\FrontendController::class, 'storeIncompleteOrder'])
+    ->middleware('throttle:60,1')
+    ->name('incomplete.order.store');
 
 // RedX Webhook (CSRF excluded)
 Route::post('/api/redx/webhook', [\App\Http\Controllers\Admin\RedXWebhookController::class, 'handleWebhook'])
@@ -349,8 +358,10 @@ Route::delete('/admin/complaints/{id}', [AdminComplaintController::class, 'destr
     ->middleware(['auth:admin', 'admin', 'demo_mode'])->name('backEnd.complaints.destroy');
 
 
-Route::post('cart/apply-coupon', [ShoppingController::class, 'applyCoupon'])->name('coupon.apply');
-Route::get('cart/remove-coupon', [ShoppingController::class, 'removeCoupon'])->name('coupon.remove');
+Route::post('cart/apply-coupon', [ShoppingController::class, 'applyCoupon'])
+    ->middleware('throttle:30,1')
+    ->name('coupon.apply');
+Route::match(['get', 'post'], 'cart/remove-coupon', [ShoppingController::class, 'removeCoupon'])->name('coupon.remove');
 Route::prefix('admin')->middleware(['auth:admin', 'admin', 'demo_mode'])->group(function () {
     // Fund Routes
     Route::get('/fund', [FundController::class, 'index'])->name('admin.fund.index');
@@ -421,6 +432,20 @@ Route::prefix('admin')->middleware(['auth:admin', 'admin', 'demo_mode'])->group(
     // ইনকমপ্লিট অর্ডার ডিলিট
     Route::delete('/incomplete-orders/{id}', [IncompleteOrderController::class, 'destroy'])
         ->name('admin.incomplete-orders.destroy');
+
+    // ⭐ রিকভারি স্ট্যাটাস/নোট আপডেট (কোনো SMS পাঠানো হয় না)
+    Route::post('/incomplete-orders/{id}/recovery', [IncompleteOrderController::class, 'updateRecovery'])
+        ->name('admin.incomplete-orders.recovery');
+
+    // ⭐ স্টক অ্যালার্ট — কোন প্রোডাক্ট ফুরিয়ে গেছে / প্রায় শেষ
+    Route::get('/stock-alerts', [\App\Http\Controllers\Admin\StockAlertController::class, 'index'])
+        ->name('admin.stock_alerts.index');
+    Route::post('/stock-alerts/{id}/restock', [\App\Http\Controllers\Admin\StockAlertController::class, 'restock'])
+        ->name('admin.stock_alerts.restock');
+    Route::get('/stock-alerts/{id}/dismiss', [\App\Http\Controllers\Admin\StockAlertController::class, 'dismiss'])
+        ->name('admin.stock_alerts.dismiss');
+    Route::get('/stock-alerts-scan', [\App\Http\Controllers\Admin\StockAlertController::class, 'scan'])
+        ->name('admin.stock_alerts.scan');
 
     // Reseller Orders Management
     Route::get('/reseller-orders', [\App\Http\Controllers\Admin\ResellerOrderController::class, 'index'])
@@ -502,6 +527,11 @@ Route::post('/cart/store', [FrontendController::class, 'cartStore'])->name('cart
     Route::get('cart/sidebar', [ShoppingController::class, 'sidebarCart'])->name('cart.sidebar');
     Route::get('/cart/change-product', [ShoppingController::class, 'changeProduct'])->name('cart.changeProduct');
     Route::get('cart/update', [ShoppingController::class, 'cart_update'])->name('cart.update');
+
+    // ⭐ অর্ডার বাম্প — চেকআউট থেকে এক ক্লিকে অফার প্রোডাক্ট কার্টে যোগ
+    Route::post('cart/add-bump', [ShoppingController::class, 'addOrderBump'])
+        ->middleware('throttle:30,1')
+        ->name('cart.addBump');
 
 
 });
@@ -598,6 +628,19 @@ Route::match(['put', 'post'], 'coupon/update/{id}', [CouponController::class, 'u
 
 Route::delete('coupon/destroy/{id}', [CouponController::class, 'destroy'])
      ->name('admin.coupons.destroy');
+
+// ⭐ কুপনের ব্যবহারের হিসাব রিসেট (সীমা আবার শূন্য থেকে শুরু)
+Route::get('coupon/{id}/reset-usage', [CouponController::class, 'resetUsage'])
+     ->name('admin.coupons.reset_usage');
+
+// 🟢 Order Bump Management (চেকআউট অ্যাড-অন অফার)
+Route::get('order-bump/manage', [\App\Http\Controllers\Admin\OrderBumpController::class, 'index'])->name('admin.order_bumps.index');
+Route::get('order-bump/create', [\App\Http\Controllers\Admin\OrderBumpController::class, 'create'])->name('admin.order_bumps.create');
+Route::post('order-bump/save', [\App\Http\Controllers\Admin\OrderBumpController::class, 'store'])->name('admin.order_bumps.store');
+Route::get('order-bump/{id}/edit', [\App\Http\Controllers\Admin\OrderBumpController::class, 'edit'])->name('admin.order_bumps.edit');
+Route::match(['put', 'post'], 'order-bump/update/{id}', [\App\Http\Controllers\Admin\OrderBumpController::class, 'update'])->name('admin.order_bumps.update');
+Route::post('order-bump/{id}/toggle', [\App\Http\Controllers\Admin\OrderBumpController::class, 'toggle'])->name('admin.order_bumps.toggle');
+Route::delete('order-bump/destroy/{id}', [\App\Http\Controllers\Admin\OrderBumpController::class, 'destroy'])->name('admin.order_bumps.destroy');
 
 // লাইসেন্স ইনফরমেশন দেখার রাউট
 Route::get('license-info', [App\Http\Controllers\Admin\LicenseController::class, 'licenseInfo'])->name('admin.license.info');
@@ -963,6 +1006,8 @@ Route::get('dashboard', [DashboardController::class, 'dashboard'])->name('admin.
     Route::post('campaign/{id}/builder', [CampaignController::class,'saveBuilder'])->name('campaign.builder.save');
     Route::delete('campaign/{id}/builder', [CampaignController::class,'clearBuilder'])->name('campaign.builder.clear');
     Route::get('campaign/{id}/show', [CampaignController::class,'show'])->name('campaign.show');
+    // ⭐ প্রতি-ক্যাম্পেইন অ্যানালিটিক্স (ভিজিট → অর্ডার, কনভার্শন রেট)
+    Route::get('campaign/{id}/analytics', [CampaignController::class,'analytics'])->name('campaign.analytics');
     Route::get('campaign/create', [CampaignController::class,'create'])->name('campaign.create');
     Route::post('campaign/save', [CampaignController::class,'store'])->name('campaign.store');
     Route::get('campaign/{id}/edit', [CampaignController::class,'edit'])->name('campaign.edit');

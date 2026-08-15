@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     @php
         $pixels = $pixels ?? collect();
         $gtm_code = $gtm_code ?? collect();
@@ -57,12 +58,20 @@
                 }
             }
 
+            $variantRows = collect($product->variantPrices ?? []);
+            $hasVariantStock = $variantRows->contains(fn ($variant) => $variant->stock !== null);
+            $totalStock = $hasVariantStock
+                ? $variantRows->sum(fn ($variant) => max(0, (int) $variant->stock))
+                : (int) ($product->stock ?? 0);
+
             return [
                 'id' => (string) $product->id,
                 'name' => strip_tags($product->name ?? ''),
                 'price' => (float) $product->new_price,
                 'old_price' => (float) $product->old_price,
                 'image' => asset(optional($product->image)->image ?? 'public/uploads/default.webp'),
+                'stock' => (int) $totalStock,
+                'has_stock' => (bool) $hasVariantStock || ($product->stock ?? null) !== null,
                 'sizes' => array_values($sizeOptions),
                 'colors' => array_values($colorOptions),
                 'variants' => optional($product->variantPrices)->map(fn ($variant) => [
@@ -105,8 +114,16 @@
     <meta property="og:url" content="{{ route('campaign', $campaign_data->slug) }}">
     @if($campaignImage)<meta property="og:image" content="{{ asset($campaignImage) }}">@endif
     <link rel="shortcut icon" href="{{ asset(optional($generalsetting)->favicon) }}" type="image/x-icon">
-    <link rel="stylesheet" href="{{ asset('public/frontEnd/campaign/css/all.css') }}">
-    <link rel="stylesheet" href="{{ asset('public/frontEnd/campaign/css/bootstrap.min.css') }}">
+
+    {{-- ⭐ স্ট্রাকচার্ড ডেটা (JSON-LD) — সার্চ রেজাল্টে দাম, স্টক ও রেটিং দেখানোর জন্য --}}
+    {!! app(\App\Services\ProductSchemaService::class)->campaignScript(
+            $campaign_data,
+            $products,
+            route('campaign', $campaign_data->slug)
+       ) !!}
+    {{-- bootstrap.min.css (216K), FontAwesome all.css (140K) ও jQuery (88K) সরানো হয়েছে —
+         এই পেজের সব স্টাইল campaign-page-renderer.css + builder-এর page_css থেকে আসে
+         এবং renderer JS সম্পূর্ণ vanilla। FB ads ট্রাফিকের জন্য ~৩৫০KB সাশ্রয়। --}}
     <link rel="stylesheet" href="{{ asset('public/frontEnd/css/campaign-page-renderer.css') }}">
     <style id="campaign-builder-page-css">{!! $campaign_data->page_css !!}</style>
 
@@ -165,6 +182,7 @@
         data-cart-decrement-url="{{ route('cart.decrement') }}"
         data-cart-remove-url="{{ route('cart.remove') }}"
         data-shipping-url="{{ route('shipping.charge') }}"
+        data-incomplete-order-url="{{ route('incomplete.order.store') }}"
     >
         {!! $publishedHtml !!}
     </main>
@@ -183,11 +201,62 @@
         @include('frontEnd.layouts.pages.campaign.partials.builder-checkout')
     </template>
 
+    {{-- ===== Size/Color popup (storefront style — legacy campaign page-এর মতো) ===== --}}
+    <div class="cpb-modal" id="cpb-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="cpb-modal-title">
+        <div class="cpb-modal-bg" data-cpb-modal-close></div>
+        <div class="cpb-modal-box">
+            <div class="cpb-modal-head">
+                <h5 id="cpb-modal-title">🛒 সাইজ ও কালার বেছে নিন</h5>
+                <button type="button" class="cpb-modal-x" data-cpb-modal-close aria-label="বন্ধ করুন">✕</button>
+            </div>
+            <div class="cpb-modal-body">
+                <div class="cpb-modal-img"><img id="cpb-mo-img" src="" alt="Product"></div>
+                <div>
+                    <h4 class="cpb-modal-name" id="cpb-mo-name"></h4>
+                    <div class="cpb-modal-price">
+                        <b id="cpb-mo-price"></b>
+                        <del id="cpb-mo-old"></del>
+                        <span class="cpb-modal-save" id="cpb-mo-save"></span>
+                    </div>
+                    <div class="cpb-modal-stock" id="cpb-mo-stock"></div>
+                    <div id="cpb-size-wrap" hidden>
+                        <p class="cpb-lbl">সাইজ সিলেক্ট করুন <em>*</em></p>
+                        <div class="cpb-chips" id="cpb-sizes"></div>
+                    </div>
+                    <div id="cpb-color-wrap" hidden>
+                        <p class="cpb-lbl">কালার সিলেক্ট করুন <em>*</em></p>
+                        <div class="cpb-chips" id="cpb-colors"></div>
+                    </div>
+                    <p class="cpb-lbl">পরিমাণ</p>
+                    <div class="cpb-qty">
+                        <button type="button" data-cpb-qty="-1" aria-label="কমান">−</button>
+                        <input type="text" id="cpb-qty-box" value="1" readonly aria-label="পরিমাণ">
+                        <button type="button" data-cpb-qty="1" aria-label="বাড়ান">+</button>
+                    </div>
+                    <div class="cpb-modal-total"><span>সর্বমোট</span><b id="cpb-mo-total">৳ 0</b></div>
+                    <button type="button" class="cpb-modal-confirm" id="cpb-mo-confirm">✓ কনফার্ম করুন — চেকআউটে যোগ হবে</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- ===== নির্বাচিত ভ্যারিয়েন্ট সামারি (checkout-এর উপরে দেখানো হয়) ===== --}}
+    <template id="cpb-selected-variant-template">
+        <div class="cpb-selected-variant" id="cpb-selected-variant" hidden>
+            <span id="cpb-selected-variant-text"></span>
+            <button type="button" id="cpb-change-variant">সাইজ/কালার বদলান</button>
+        </div>
+    </template>
+
+    {{-- ===== Visual design ON/OFF toggle ===== --}}
+    <button id="cpb-design-toggle" class="cpb-design-toggle" type="button" aria-pressed="true" title="বিল্ডার ডিজাইন দেখান/লুকান">
+        <span aria-hidden="true">🎨</span><span data-design-toggle-label>ডিজাইন লুকান</span>
+    </button>
+
     <div id="cpb-store-loading" class="cpb-store-loading" hidden><span></span><strong>আপনার অর্ডার আপডেট হচ্ছে...</strong></div>
-    <button id="cpb-sticky-order" class="cpb-sticky-order" type="button" hidden><i class="fas fa-shopping-bag"></i><span>এখনই অর্ডার করুন</span></button>
+    <button id="cpb-sticky-order" class="cpb-sticky-order" type="button" hidden><span aria-hidden="true">🛍️</span><span>এখনই অর্ডার করুন</span></button>
     <div id="cpb-store-toast" class="cpb-store-toast" role="status" aria-live="polite"></div>
 
-    <script src="{{ asset('public/frontEnd/js/jquery-3.6.3.min.js') }}"></script>
     <script src="{{ asset('public/frontEnd/js/campaign-page-renderer.js') }}"></script>
 </body>
 </html>

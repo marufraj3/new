@@ -552,31 +552,72 @@ $brands = Brand::where('status', 1)
         ));
     }
 	
+    /**
+     * অ্যাবানডনড কার্ট (ইনকমপ্লিট অর্ডার) সেভ।
+     *
+     * আগে এই ফাংশনের কোনো রুট ছিল না, আর চেকআউট পেজ যে রুটে POST করত সেটি
+     * ['auth:admin','admin'] middleware-এর পেছনে থাকায় কাস্টমারের প্রতিটি
+     * রিকোয়েস্ট ফেল করত। এখন এটিই একমাত্র ইমপ্লিমেন্টেশন এবং
+     * route('incomplete.order.store') সরাসরি এখানে আসে।
+     */
     public function storeIncompleteOrder(Request $request)
     {
         try {
             $validated = $request->validate([
                 'name'          => 'nullable|string|max:255',
                 'phone'         => 'nullable|string|max:55',
-                'address'       => 'nullable|string|max:500',
+                'address'       => 'nullable|string|max:1000',
                 'items'         => 'nullable|array',
-                'product_image' => 'nullable|string',
-                'product_link'  => 'nullable|string',
+                'items.*.id'    => 'nullable',
+                'items.*.name'  => 'nullable|string|max:255',
+                'items.*.qty'   => 'nullable|numeric',
+                'items.*.price' => 'nullable|numeric',
+                'items.*.image' => 'nullable|string|max:1000',
+                'items.*.link'  => 'nullable|string|max:1000',
+                'product_image' => 'nullable|string|max:1000',
+                'product_link'  => 'nullable|string|max:1000',
                 'total_amount'  => 'nullable|numeric',
+                'source'        => 'nullable|string|max:100',
             ]);
 
-            $total = isset($validated['total_amount']) ? floatval($validated['total_amount']) : 0;
+            $phone = preg_replace('/[^0-9+]/', '', (string) ($validated['phone'] ?? ''));
+            $items = $validated['items'] ?? [];
 
+            // ফোন নম্বর ছাড়া লিডটির কোনো মূল্য নেই — ফলো-আপ করা যাবে না।
+            if ($phone === '' || strlen($phone) < 6) {
+                return response()->json([
+                    'status'  => 'ignore',
+                    'message' => 'Phone number required to save an incomplete order.',
+                ]);
+            }
+
+            if (empty($items)) {
+                return response()->json([
+                    'status'  => 'ignore',
+                    'message' => 'No items in cart, skip saving.',
+                ]);
+            }
+
+            $total = isset($validated['total_amount']) ? (float) $validated['total_amount'] : 0;
+
+            if ($total <= 0) {
+                $total = collect($items)->sum(function ($item) {
+                    return (float) ($item['price'] ?? 0) * max(1, (int) ($item['qty'] ?? 1));
+                });
+            }
+
+            $firstItem = collect($items)->first();
+
+            // একই ফোন নম্বরের জন্য একটাই সারি — নয়তো প্রতি keystroke-এ নতুন
+            // রেকর্ড তৈরি হয়ে অ্যাডমিন লিস্ট ভরে যায়।
             $incomplete = IncompleteOrder::updateOrCreate(
-                [
-                    'phone'   => $validated['phone'] ?? null,
-                    'address' => $validated['address'] ?? null,
-                ],
+                ['phone' => $phone],
                 [
                     'name'          => $validated['name'] ?? null,
-                    'items'         => $validated['items'] ?? [],
-                    'product_image' => $validated['product_image'] ?? null,
-                    'product_link'  => $validated['product_link'] ?? null,
+                    'address'       => $validated['address'] ?? null,
+                    'items'         => $items,
+                    'product_image' => $validated['product_image'] ?? ($firstItem['image'] ?? null),
+                    'product_link'  => $validated['product_link'] ?? ($firstItem['link'] ?? null),
                     'total_amount'  => $total,
                 ]
             );
@@ -584,13 +625,20 @@ $brands = Brand::where('status', 1)
             return response()->json([
                 'status'  => 'success',
                 'message' => 'Incomplete order saved successfully.',
-                'data'    => $incomplete
-            ], 200);
-        } catch (\Exception $e) {
-            \Log::error('Incomplete order save failed: '.$e->getMessage());
+                'data'    => ['id' => $incomplete->id],
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'Failed to save incomplete order: '.$e->getMessage()
+                'message' => 'Validation failed.',
+                'errors'  => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Incomplete order save failed: ' . $e->getMessage());
+
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Failed to save incomplete order.',
             ], 500);
         }
     }
@@ -1227,12 +1275,29 @@ $brands = Brand::where('status', 1)
             }
         })->afterResponse();
 
+        // ⭐ ক্যাম্পেইন অ্যানালিটিক্স — এই পেজের ভিজিট গোনা হচ্ছে।
+        // পরে অর্ডারের সাথে মিলিয়ে কনভার্শন রেট বের করা হবে।
+        app(\App\Services\CampaignAnalyticsService::class)->recordVisit($campaign_data->id);
+
+        // কোন ক্যাম্পেইন থেকে চেকআউটে এলো সেটা সেশনে রেখে দিই — অর্ডার সেভের
+        // সময় orders.campaign_id-তে বসবে, তাই ভিজিট → অর্ডার মেলানো যাবে।
+        Session::put('active_campaign_id', $campaign_data->id);
+
+        // ⭐ অর্ডার বাম্প — চেকআউটে দেখানোর মতো অ্যাড-অন অফার (AOV বাড়ানোর জন্য)
+        $orderBumps = app(\App\Services\OrderBumpService::class)
+            ->availableFor($campaign_data->id);
+
+        if ($orderBumps->isNotEmpty()) {
+            app(\App\Services\OrderBumpService::class)->recordImpressions($orderBumps);
+        }
+
         $viewData = compact(
             'campaign_data',
             'products',
             'shippingcharge',
             'tiktok_pixels',
-            'fb_view_content_event_id'
+            'fb_view_content_event_id',
+            'orderBumps'
         );
 
         // Page builder দিয়ে ডিজাইন করা থাকলে আলাদা ভিউ

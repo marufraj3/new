@@ -474,6 +474,51 @@
 </li>
 @endcanany
 
+{{-- 🛒 Order Bump (চেকআউট অ্যাড-অন অফার) --}}
+@canany(['coupon-list', 'coupon-create', 'coupon-edit', 'coupon-delete'])
+<li>
+  <a href="#sidebar-order-bump" data-bs-toggle="collapse">
+    <i data-feather="shopping-bag"></i>
+    <span> Order Bumps </span>
+    <span class="menu-arrow"></span>
+  </a>
+  <div class="collapse" id="sidebar-order-bump">
+    <ul class="nav-second-level">
+      <li>
+        <a href="{{ route('admin.order_bumps.index') }}">
+          <i data-feather="list"></i> All Bumps
+        </a>
+      </li>
+      <li>
+        <a href="{{ route('admin.order_bumps.create') }}">
+          <i data-feather="plus-circle"></i> Add New
+        </a>
+      </li>
+    </ul>
+  </div>
+</li>
+@endcanany
+
+{{-- 📦 স্টক অ্যালার্ট — কোন প্রোডাক্ট ফুরিয়ে গেছে --}}
+@php
+    $stockAlertCount = 0;
+    try {
+        $stockAlertCount = app(\App\Services\StockAlertService::class)->unreadCount();
+    } catch (\Throwable $e) {
+        $stockAlertCount = 0;
+    }
+@endphp
+<li>
+  <a href="{{ route('admin.stock_alerts.index') }}">
+    <i data-feather="alert-triangle"></i>
+    <span> Stock Alerts </span>
+    @if ($stockAlertCount > 0)
+      <span class="badge badge-danger ml-1">{{ $stockAlertCount }}</span>
+    @endif
+  </a>
+</li>
+
+
 
 
 
