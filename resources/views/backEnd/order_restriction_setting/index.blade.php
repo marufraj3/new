@@ -144,7 +144,21 @@
                 </div>
                 
                 <div class="card-body p-4">
-                    
+
+                    {{-- ফিচারটি আপাতত বন্ধ — সেটিংস সেভ হবে, কিন্তু চেকআউটে প্রয়োগ হবে না --}}
+                    <div class="alert alert-warning d-flex gap-2 align-items-start mb-4" role="alert">
+                        <i class="fe-alert-triangle mt-1"></i>
+                        <div>
+                            <strong>এই ফিচারটি বর্তমানে বন্ধ আছে।</strong>
+                            <div class="small mt-1">
+                                সীমা নির্ধারণ করলে তা সেভ হবে, কিন্তু চেকআউটে কোনো অর্ডার আটকানো হবে না।
+                                আগের সংস্করণে ফোন নম্বরের পাশাপাশি IP ঠিকানা দিয়েও গণনা হতো — মোবাইল ডেটা (CGNAT)
+                                বা অফিস/হোস্টেলের শেয়ার্ড ওয়াইফাইয়ে একাধিক আলাদা কাস্টমার একই IP থেকে আসায়
+                                নির্দোষ অর্ডারও আটকে যেত। তাই আপাতত নিষ্ক্রিয় রাখা হয়েছে।
+                            </div>
+                        </div>
+                    </div>
+
                     <form action="{{ route('admin.order.restriction.setting.update') }}" method="POST">
                         @csrf
                         

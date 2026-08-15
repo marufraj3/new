@@ -830,18 +830,29 @@ public function order_save(Request $request)
             return redirect()->back();
         }
 
-        // ⭐ অর্ডার রেস্ট্রিকশন — অ্যাডমিন প্যানেলের Order Restriction Settings
-        // (order_limit_time / order_limit_qty) এখানে কার্যকর হয়। একই ফোন নম্বর বা
-        // একই IP থেকে নির্দিষ্ট সময়ে নির্দিষ্ট সংখ্যার বেশি অর্ডার আটকে দেওয়া হয়।
-        $restrictionMessage = app(\App\Services\OrderRestrictionService::class)
-            ->violationMessage($request->phone, $request->ip());
-
-        if ($restrictionMessage) {
-            Toastr::error($restrictionMessage, 'অর্ডার সীমা অতিক্রান্ত!');
-            return redirect()->back()
-                ->withErrors(['order_limit' => $restrictionMessage])
-                ->withInput();
-        }
+        /* ─────────────────────────────────────────────────────────────────
+         * অর্ডার রেস্ট্রিকশন — আপাতত বন্ধ (ইচ্ছাকৃতভাবে)।
+         *
+         * কেন বন্ধ: enforcement টি ফোন নম্বরের পাশাপাশি IP দিয়েও ম্যাচ করত।
+         * বাংলাদেশে মোবাইল অপারেটরের CGNAT আর অফিস/হোস্টেলের শেয়ার্ড ওয়াইফাইয়ে
+         * বহু আলাদা কাস্টমার একই পাবলিক IP থেকে আসে — ফলে একজনের অর্ডার
+         * সম্পূর্ণ অপরিচিত আরেকজনের অর্ডার আটকে দিতে পারত। ভুয়া অর্ডার
+         * ঠেকানোর চেয়ে আসল বিক্রি হারানোর ঝুঁকিই বেশি ছিল।
+         *
+         * সার্ভিস ক্লাস, অ্যাডমিন সেটিংস পেজ ও ডেটাবেস কলামগুলো অক্ষত আছে —
+         * শুধু চেকআউটে প্রয়োগ করা হচ্ছে না। আবার চালু করতে হলে নিচের ব্লকটি
+         * আন-কমেন্ট করলেই হবে (তার আগে OrderRestrictionService থেকে IP
+         * ম্যাচিং অংশটুকু বাদ দিয়ে শুধু ফোন নম্বরে সীমাবদ্ধ করার পরামর্শ থাকল)।
+         * ───────────────────────────────────────────────────────────────── */
+        // $restrictionMessage = app(\App\Services\OrderRestrictionService::class)
+        //     ->violationMessage($request->phone, $request->ip());
+        //
+        // if ($restrictionMessage) {
+        //     Toastr::error($restrictionMessage, 'অর্ডার সীমা অতিক্রান্ত!');
+        //     return redirect()->back()
+        //         ->withErrors(['order_limit' => $restrictionMessage])
+        //         ->withInput();
+        // }
 
         // ⭐ ভ্যারিয়েন্ট (সাইজ/কালার) ভ্যালিডেশন — অর্ডারের আগে স্টক নিশ্চিত করি
         foreach (Cart::instance('shopping')->content() as $cartItem) {
