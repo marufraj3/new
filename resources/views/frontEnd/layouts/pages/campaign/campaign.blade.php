@@ -461,11 +461,11 @@
             <div class="container my-2 my-md-4">
                 <div class="row justify-content-center">
                     <div class="col-md-8">
-                        <h2 class="text-center p-2 p-md-4 rounded" style="background-color:#FBEFF7;border:2px dashed #F1ACE7">আমাদের থেকে বিস্তারিত জানতে এই নাম্বারে কল করুন {{$contact->phone}}</h2>
+                        <h2 class="text-center p-2 p-md-4 rounded" style="background-color:#FBEFF7;border:2px dashed #F1ACE7">আমাদের থেকে বিস্তারিত জানতে এই নাম্বারে কল করুন {{ optional($contact)->phone }}</h2>
                         <div class="row justify-content-center my-2 my-md-4 gy-2">
                             <div class="col-md-6 custom_btn">
                                 <div class="shadow-lg">
-                                    <a href="tel:{{$contact->phone}}" 
+                                    <a href="tel:{{ optional($contact)->phone }}" 
                                     class="btn btn-danger btn-lg d-block py-md-3 fs-2 fw-bolder button-3d button-animated-border" >
                                         <i class="fa-solid fa-phone"></i> আমাদের কল করুন </a>
                                 </div>
@@ -473,7 +473,7 @@
                             </div>
                             <div class="col-md-6">
                             <div class="shadow-lg">
-                                <a href="https://wa.me/{{$contact->whatsapp}}" 
+                                <a href="https://wa.me/{{ preg_replace('/\D+/', '', optional($contact)->whatsapp ?? '') }}" 
                                 class="btn btn-success btn-lg d-block py-md-3 fs-2 text-light fw-bolder button-3d button-animated-border">
                                     <i class="fa-brands fa-whatsapp"></i> হোয়াটসঅ্যাপ  
                                     </a>
@@ -597,7 +597,7 @@
                         @if($products->count()>1)
                         <div class="card mb-2 ">
                           <div class="card-header">
-                                <h5 class="potro_font">একটি পণ্য সিলেক্ট করুনণ </h5>
+                                <h5 class="potro_font">একটি পণ্য সিলেক্ট করুন </h5>
                             </div>  
                              <div class="card-body">
                                 <div class="row g-2">
@@ -606,7 +606,7 @@
                                             <div class="border shadow"> <!-- Wrap the card with form-check for better usability -->
                                                 <input type="radio" class="form-check-input" name="product" id="product_{{ $product->id }}" value="{{ $product->id }}" {{ $loop->first ? 'checked' : '' }} style="display: none;" onchange="updateCart('{{ $product->id }}')">
                                                 <label for="product_{{ $product->id }}" class="card shadow-sm product-card {{ $loop->first ? 'selected' : '' }}" style="cursor: pointer;"> <!-- Add class for styling -->
-                                                    <img src="{{ asset($product->image->image) }}" class="card-img-top" alt="{{ $product->name }}" style="height: 100px; object-fit: cover;"> <!-- Fixed height and object-fit -->
+                                                    <img src="{{ asset(optional($product->image)->image ?? 'public/uploads/default.webp') }}" class="card-img-top" alt="{{ $product->name }}" style="height: 100px; object-fit: cover;">
                                                     <div class="card-body p-1 text-center"> <!-- Centered text for a better layout -->
                                                         <div class="card-title">{{ Str::limit($product->name, 20) }}</div>
                                                         <div class="card-text mb-1">৳{{ $product->new_price }} <del>৳{{ $product->old_price }}</del></div>
@@ -639,9 +639,9 @@
                                         <tr>
                                           
                                             <td class="text-left">
-                                                 <a style="font-size: 14px;" href="{{route('product',$value->options->slug)}}"><img src="{{asset($value->options->image)}}" height="30" width="30"> {{Str::limit($value->name,20)}}</a>
+                                                 <a style="font-size: 14px;" href="{{route('product',$value->options->slug)}}"><img src="{{ asset($value->options->image ?? 'public/uploads/default.webp') }}" height="30" width="30"> {{Str::limit($value->name,20)}}</a>
                                                 @php
-                                                    $product = App\Models\Product::find($value->id);
+                                                    $product = $products->firstWhere('id', $value->id);
                                                 @endphp
                                              
                                                @if($product && ($product->sizes->isNotEmpty() || $product->colors->isNotEmpty()))
@@ -730,6 +730,7 @@
                     <div class="checkout-shipping" id="order_form">
                         <form action="{{route('customer.ordersave')}}" method="POST" data-parsley-validate="">
                         @csrf
+                        <input type="hidden" name="payment_method" value="cod">
                         <div class="card">
                             <div class="card-header">
                                 <h5 class="potro_font">আপনার ইনফরমেশন দিন  </h5>
@@ -763,8 +764,8 @@
                                     <div class="col-sm-12">
                                         <div class="form-group mb-3">
                                             <label for="address">আপনার ঠিকানা লিখুন   *</label>
-                                            <input type="address" id="address" class="form-control @error('address') is-invalid @enderror" placeholder="জেলা, থানা, গ্রাম " name="address" value="{{old('address')}}"  required>
-                                            @error('email')
+                                            <input type="text" id="address" class="form-control @error('address') is-invalid @enderror" placeholder="জেলা, থানা, গ্রাম " name="address" value="{{old('address')}}"  required>
+                                            @error('address')
                                                 <span class="invalid-feedback" role="alert">
                                                     <strong>{{ $message }}</strong>
                                                 </span>
@@ -774,12 +775,12 @@
                                     <div class="col-sm-12">
                                         <div class="form-group mb-3">
                                             <label for="area">আপনার এরিয়া সিলেক্ট করুন  *</label>
-                                            <select type="area" id="area" class="form-control @error('area') is-invalid @enderror" name="area"   required>
+                                            <select id="area" class="form-control @error('area') is-invalid @enderror" name="area"   required>
                                                 @foreach($shippingcharge as $key=>$value)
-                                                <option value="{{$value->id}}">{{$value->name}}</option>
+                                                <option value="{{$value->id}}" {{ (string) old('area') === (string) $value->id ? 'selected' : '' }}>{{$value->name}}</option>
                                                 @endforeach
                                             </select>
-                                            @error('email')
+                                            @error('area')
                                                 <span class="invalid-feedback" role="alert">
                                                     <strong>{{ $message }}</strong>
                                                 </span>
@@ -825,16 +826,7 @@
         <!-- bootstrap js -->
         <script>
             $(document).ready(function () {
-                $(".owl-carousel").owlCarousel({
-                    margin: 15,
-                    loop: true,
-                    dots: false,
-                    autoplay: true,
-                    autoplayTimeout: 6000,
-                    autoplayHoverPause: true,
-                    items: 1,
-                    });
-                $('.owl-nav').remove();
+                $(".campro_img_slider, .review_slider").addClass('owl-ready');
             });
         </script>
         <script>
@@ -843,11 +835,11 @@
             });
         </script>
         <script>
-             $("#area").on("change", function () {
+             $(document).on("change", "#area", function () {
                 var id = $(this).val();
                 $.ajax({
                     type: "GET",
-                    data: { id: id },
+                    data: { id: id, campaign: 1 },
                     url: "{{route('shipping.charge')}}",
                     dataType: "html",
                     success: function(response){
@@ -857,60 +849,34 @@
             });
         </script>
            <script>
-            $(".cart_remove").on("click", function () {
+            function campaignCartRequest(url, extra) {
+                var payload = $.extend({ campaign: 1 }, extra || {});
+                $.ajax({
+                    type: "GET",
+                    data: payload,
+                    url: url,
+                    success: function (data) {
+                        if (data) {
+                            $(".cartlist").html(data);
+                        }
+                    },
+                    error: function (xhr) {
+                        var message = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'কার্ট আপডেট করা যায়নি।';
+                        alert(message);
+                    }
+                });
+            }
+            $(document).on("click", ".cart_remove", function () {
                 var id = $(this).data("id");
-                $("#loading").show();
-                if (id) {
-                    $.ajax({
-                        type: "GET",
-                        data: { id: id },
-                        url: "{{route('cart.remove')}}",
-                        success: function (data) {
-                            if (data) {
-                                $(".cartlist").html(data);
-                                $("#loading").hide();
-                                return cart_count() + mobile_cart() + cart_summary();
-                            }
-                        },
-                    });
-                }
+                if (id) campaignCartRequest("{{route('cart.remove')}}", { id: id });
             });
-            $(".cart_increment").on("click", function () {
+            $(document).on("click", ".cart_increment", function () {
                 var id = $(this).data("id");
-                $("#loading").show();
-                if (id) {
-                    $.ajax({
-                        type: "GET",
-                        data: { id: id },
-                        url: "{{route('cart.increment')}}",
-                        success: function (data) {
-                            if (data) {
-                                $(".cartlist").html(data);
-                                $("#loading").hide();
-                                return cart_count() + mobile_cart();
-                            }
-                        },
-                    });
-                }
+                if (id) campaignCartRequest("{{route('cart.increment')}}", { id: id });
             });
-
-            $(".cart_decrement").on("click", function () {
+            $(document).on("click", ".cart_decrement", function () {
                 var id = $(this).data("id");
-                $("#loading").show();
-                if (id) {
-                    $.ajax({
-                        type: "GET",
-                        data: { id: id },
-                        url: "{{route('cart.decrement')}}",
-                        success: function (data) {
-                            if (data) {
-                                $(".cartlist").html(data);
-                                $("#loading").hide();
-                                return cart_count() + mobile_cart();
-                            }
-                        },
-                    });
-                }
+                if (id) campaignCartRequest("{{route('cart.decrement')}}", { id: id });
             });
 
         </script>
@@ -919,7 +885,7 @@
                 dots: false,
                 arrow: false,
                 autoplay: true,
-                loop: true,
+                loop: $('.review_slider .review_item').length > 5,
                 margin: 10,
                 smartSpeed: 1000,
                 mouseDrag: true,
@@ -948,7 +914,7 @@
                 dots: false,
                 arrow: false,
                 autoplay: true,
-                loop: true,
+                loop: $('.campro_img_slider .campro_img_item').length > 3,
                 margin: 10,
                 smartSpeed: 1000,
                 mouseDrag: true,
@@ -1027,16 +993,14 @@
                 }
                 // ==============================
 
-                $("#loading").show();
                 if (productId) {
                     $.ajax({
                         type: "GET",
-                        data: { id: productId },
+                        data: { id: productId, campaign: 1 },
                         url: "{{route('cart.changeProduct')}}",
                         success: function (data) {
                             if (data) {
                                 $(".cartlist").html(data);
-                                $("#loading").hide();
                             }
                         },
                     });

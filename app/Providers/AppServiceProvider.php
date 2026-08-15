@@ -154,27 +154,34 @@ class AppServiceProvider extends ServiceProvider
          * 🧠 Global View Share (Optimized with Cache)
          */
         try {
-            // Cache pending reviews count (5 minutes)
-            $pending_reviews = Cache::remember('pending_reviews_count', 300, function () {
-                return Review::where('status', 'pending')->count();
-            });
-            view()->share('pending_reviews', $pending_reviews); 
+            $isAdminRequest = request()->is('admin') || request()->is('admin/*');
+
+            if ($isAdminRequest) {
+                view()->share('pending_reviews', Cache::remember('pending_reviews_count', 300, function () {
+                    return Review::where('status', 'pending')->count();
+                }));
+            } else {
+                view()->share('pending_reviews', 0);
+            }
             
-            // Cache general setting (30 minutes)
             $generalsetting = Cache::remember('general_setting', 1800, function () {
                 return GeneralSetting::where('status', 1)->first();
             });
             view()->share('generalsetting', $generalsetting);
             view()->share('demoMode', filter_var(env('DEMO_MODE', false), FILTER_VALIDATE_BOOLEAN));
             
-            // Cache categories (30 minutes)
             $sidecategories = Cache::remember('side_categories', 1800, function () {
                 return Category::where('parent_id', 0)->where('status', 1)->select('id', 'name', 'slug', 'status', 'image')->get();
             });
             view()->share('sidecategories', $sidecategories);
             
-            $menucategories = Cache::remember('menu_categories', 1800, function () {
-                return Category::where('status', 1)->select('id', 'name', 'slug', 'status', 'image')->get();
+            $menucategories = Cache::remember('menu_categories_nav', 1800, function () {
+                return Category::where('status', 1)
+                    ->where('parent_id', 0)
+                    ->select('id', 'name', 'slug', 'status', 'image', 'icon')
+                    ->with(['subcategories.childcategories'])
+                    ->orderBy('id', 'ASC')
+                    ->get();
             });
             view()->share('menucategories', $menucategories);
             
@@ -206,29 +213,26 @@ class AppServiceProvider extends ServiceProvider
             });
             view()->share('cmnmenu', $cmnmenu);
             
-            // Cache brands (30 minutes)
             $brands = Cache::remember('brands_list', 1800, function () {
-                return Brand::where('status', 1)->get();
+                return Brand::where('status', 1)->select('id', 'name', 'slug', 'image')->limit(24)->get();
             });
             view()->share('brands', $brands);
-            
-            // Cache order count (2 minutes - needs to be fresh)
-            $neworder = Cache::remember('new_order_count', 120, function () {
-                return Order::where('order_status', 1)->count();
-            });
-            view()->share('neworder', $neworder);
-            
-            // Cache pending orders (2 minutes)
-            $pendingorder = Cache::remember('pending_orders_list', 120, function () {
-                return Order::where('order_status', 1)->latest()->limit(9)->get();
-            });
-            view()->share('pendingorder', $pendingorder);
-            
-            // Cache order status (30 minutes)
-            $orderstatus = Cache::remember('order_status_list', 1800, function () {
-                return OrderStatus::get();
-            });
-            view()->share('orderstatus', $orderstatus);
+
+            if ($isAdminRequest) {
+                view()->share('neworder', Cache::remember('new_order_count', 120, function () {
+                    return Order::where('order_status', 1)->count();
+                }));
+                view()->share('pendingorder', Cache::remember('pending_orders_list', 120, function () {
+                    return Order::where('order_status', 1)->latest()->limit(9)->get();
+                }));
+                view()->share('orderstatus', Cache::remember('order_status_list', 1800, function () {
+                    return OrderStatus::get();
+                }));
+            } else {
+                view()->share('neworder', 0);
+                view()->share('pendingorder', collect());
+                view()->share('orderstatus', collect());
+            }
             
             // Cache pixels (30 minutes)
             $pixels = Cache::remember('pixels_list', 1800, function () {
@@ -248,8 +252,7 @@ class AppServiceProvider extends ServiceProvider
                 view()->share('vendor', $vendor);
             }
             
-            // Share reseller notification data for reseller views (Cached 2 min - performance fix)
-            if (Auth::guard('admin')->check()) {
+            if ($isAdminRequest && Auth::guard('admin')->check()) {
                 $resellerUser = Auth::guard('admin')->user();
                 $isReseller = $resellerUser->hasRole('reseller') || 
                               (isset($resellerUser->role) && strtolower($resellerUser->role) === 'reseller') ||

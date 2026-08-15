@@ -29,7 +29,7 @@
 <link rel="stylesheet" href="{{ url('/responsive.css') }}?v=2">
         <link rel="stylesheet" href="{{asset('public/frontEnd/css/main.css')}}" />
         <link rel="stylesheet" href="{{asset('public/frontEnd/css/news-ticker.css')}}" />
-        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+        {{-- Font Awesome 6 is loaded once near the footer --}}
         <meta name="facebook-domain-verification" content="38f1w8335btoklo88dyfl63ba3st2e" />
         <style>
             .float{
@@ -1336,8 +1336,10 @@ document.getElementById("sidebarCartOverlay")?.addEventListener("click", closeSi
         <script>
             new WOW().init();
         </script>
+        @if(request()->routeIs('customer.checkout', 'customer.account', 'customer.profile*'))
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
         <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+        @endif
 
         <!-- feather icon -->
         <script src="https://cdnjs.cloudflare.com/ajax/libs/feather-icons/4.29.0/feather.min.js"></script>
@@ -1797,24 +1799,21 @@ document.getElementById("sidebarCartOverlay")?.addEventListener("click", closeSi
         </script>
 
         <script>
-            var menu = new MmenuLight(document.querySelector("#menu"), "all");
-
-            var navigator = menu.navigation({
-                selectedClass: "Selected",
-                slidingSubmenus: true,
-                // theme: 'dark',
-                title: "ক্যাটাগরি",
-            });
-
-            var drawer = menu.offcanvas({
-                // position: 'left'
-            });
-
-            //  Open the menu.
-            document.querySelector('a[href="#menu"]').addEventListener("click", (evnt) => {
-                evnt.preventDefault();
-                drawer.open();
-            });
+            var menuRoot = document.querySelector("#menu");
+            var menuTrigger = document.querySelector('a[href="#menu"]');
+            if (menuRoot && menuTrigger && typeof MmenuLight === "function") {
+                var menu = new MmenuLight(menuRoot, "all");
+                var navigator = menu.navigation({
+                    selectedClass: "Selected",
+                    slidingSubmenus: true,
+                    title: "ক্যাটাগরি",
+                });
+                var drawer = menu.offcanvas({});
+                menuTrigger.addEventListener("click", (evnt) => {
+                    evnt.preventDefault();
+                    drawer.open();
+                });
+            }
         </script>
 
         <script>
@@ -1872,7 +1871,9 @@ document.getElementById("sidebarCartOverlay")?.addEventListener("click", closeSi
         
         
         @php
-    $popup = App\Models\Popup::where('status', 1)->latest()->first();
+    $popup = \Illuminate\Support\Facades\Cache::remember('active_frontend_popup', 300, function () {
+        return App\Models\Popup::where('status', 1)->latest()->first();
+    });
 @endphp
 
 @if($popup)

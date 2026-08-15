@@ -40,8 +40,8 @@ class CampaignController extends Controller
             'image_three' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
             'product_id' => 'required|array|min:1|exists:products,id',
             'image.*' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
-            'review' => 'required',
-            'deadline' => 'nullable|date|after:now', // Ensure deadline is a future date
+            'review' => 'nullable|string|max:255',
+            'deadline' => 'nullable|date|after:now',
             'top_title_1' => 'nullable|string|max:255',
             'top_title_2' => 'nullable|string|max:255',
             'heading_1' => 'nullable|string|max:255',
@@ -57,7 +57,8 @@ class CampaignController extends Controller
     
         // Prepare the input data
         $input = $request->except('image', 'product_id');
-        $input['status'] = true; // Set status to true if not checked
+        $input['status'] = true;
+        $input['review'] = $request->review ?: ($request->name ?? '');
     
         // Handle the first selected product ID
         $firstProductId = $request->product_id[0];
@@ -115,9 +116,11 @@ class CampaignController extends Controller
             $input['image_three'] = $imageUrl3;
         }
     
-        // Create slug
         $input['slug'] = strtolower(Str::slug($request->name));
         $input['video'] = $this->getYouTubeVideoId($request->video);
+        $input['short_description'] = $input['short_description'] ?? '';
+        $input['description'] = $input['description'] ?? '';
+        $input['image_one'] = $input['image_one'] ?? '';
     
         // Create a new campaign
         $campaign = Campaign::create($input);
@@ -142,8 +145,8 @@ class CampaignController extends Controller
             }
         }
     
-        Toastr::success('Success', 'Campaign created successfully');
-        return redirect()->route('campaign.index');
+        Toastr::success('Landing page created. Visual builder-এ ডিজাইন করুন।', 'Success');
+        return redirect()->route('campaign.builder', $campaign->id);
     }
 
     
@@ -181,7 +184,7 @@ class CampaignController extends Controller
             'image_three' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
             'product_id' => 'required|array|min:1|exists:products,id',
             'image.*' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
-            'review' => 'required',
+            'review' => 'nullable|string|max:255',
             'deadline' => 'nullable|date',
             'top_title_1' => 'nullable|string|max:255',
             'top_title_2' => 'nullable|string|max:255',
@@ -311,8 +314,14 @@ class CampaignController extends Controller
             }
         }
 
-        Toastr::success('Success','Data update successfully');
-        return redirect()->route('campaign.index');
+        Toastr::success('Settings saved. Visual builder থেকে পেজ ডিজাইন করতে পারেন।', 'Success');
+        return redirect()->route('campaign.builder', $update_data->id);
+    }
+
+    public function show($id)
+    {
+        $campaign = Campaign::findOrFail($id);
+        return redirect()->route('campaign', $campaign->slug);
     }
 
     /**
@@ -476,9 +485,12 @@ class CampaignController extends Controller
     } 
     public function getYouTubeVideoId($input)
     {
-        // Check if the input is a valid YouTube video ID (11 characters long)
+        if ($input === null || trim((string) $input) === '') {
+            return null;
+        }
+
         if (preg_match('/^[a-zA-Z0-9_-]{11}$/', $input)) {
-            return $input; // Return the ID directly if it's valid
+            return $input;
         }
     
         // Regular expression to match YouTube video URLs

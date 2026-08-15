@@ -68,9 +68,8 @@ class FrontendController extends Controller
     public function index()
     {
         // ✅ Homepage cache (5 min) - reduces DB load on high traffic
-        $cacheKey = 'frontend_homepage_v1';
-        $cacheMinutes = 5;
-        $data = Cache::remember($cacheKey, $cacheMinutes * 60, function () {
+        $cacheKey = 'frontend_homepage_v3';
+        $data = Cache::remember($cacheKey, 300, function () {
             return $this->getHomepageData();
         });
         return view('frontEnd.layouts.pages.index', $data);
@@ -81,23 +80,24 @@ class FrontendController extends Controller
      */
     protected function getHomepageData()
     {
-        // General setting
-        $generalsetting = GeneralSetting::where('status', 1)->limit(1)->first();
+        $generalsetting = Cache::remember('general_setting', 1800, function () {
+            return GeneralSetting::where('status', 1)->first();
+        });
+        $seo = Cache::remember('seo_settings_row', 1800, fn () => DB::table('seo_settings')->first());
+        $menucategories = Cache::get('menu_categories_nav');
+        if (!$menucategories) {
+            $menucategories = Category::where('status', 1)
+                ->where('parent_id', 0)
+                ->select('id', 'name', 'slug', 'icon', 'image')
+                ->with(['subcategories.childcategories'])
+                ->orderBy('id', 'ASC')
+                ->get();
+        }
 
-        // SEO setting
-        $seo = DB::table('seo_settings')->first();
-
-        // Main menu categories (for header/sidebar)
-        $menucategories = Category::where('status', 1)
-            ->where('parent_id', 0)
-            ->select('id', 'name', 'slug', 'icon', 'image')
-            ->with(['subcategories.childcategories'])
-            ->orderBy('id', 'ASC')
-            ->get();
-
-        // Front categories (যদি অন্য কোথাও ব্যবহার হয়)
-        $frontcategory = Category::where(['status' => 1])
+        $frontcategory = Category::where(['status' => 1, 'parent_id' => 0])
             ->select('id', 'name', 'image', 'icon', 'slug', 'status')
+            ->orderBy('id', 'ASC')
+            ->limit(16)
             ->get();
 
         // Banners
@@ -143,24 +143,26 @@ $brands = Brand::where('status', 1)
             ->get();
 
         // Flash sale – image + reviews eager load
+        $productCardRelations = ['prosizes', 'procolors', 'image', 'reviews', 'variantPrices.color', 'variantPrices.size'];
+
         $flas_sales = Product::where(['status' => 1, 'approval_status' => 'approved', 'flashsale' => 1])
             ->orderBy('id', 'DESC')
             ->select('id', 'name', 'slug', 'new_price', 'old_price', 'sold', 'stock')
-            ->with(['prosizes', 'procolors', 'image', 'reviews'])
+            ->with($productCardRelations)
             ->limit(12)
             ->get();
 
-        // Hot deal top – image + reviews eager load
+        // Hot deal top – image + reviews + variant stock/price
         $hotdeal_top = Product::where(['status' => 1, 'approval_status' => 'approved', 'topsale' => 1])
             ->orderBy('id', 'DESC')
             ->select('id', 'name', 'slug', 'new_price', 'old_price', 'stock')
-            ->with(['prosizes', 'procolors', 'image', 'reviews'])
+            ->with($productCardRelations)
             ->limit(12)
             ->get();
 
         $hotdeal_bottom = Product::where(['status' => 1, 'approval_status' => 'approved', 'topsale' => 1])
             ->select('id', 'name', 'slug', 'new_price', 'old_price', 'stock')
-            ->with('image')
+            ->with($productCardRelations)
             ->skip(12)
             ->limit(12)
             ->get();
@@ -387,9 +389,7 @@ $brands = Brand::where('status', 1)
         if ($variantPrice && $variantPrice->price > 0) {
             $finalPrice = $variantPrice->price;
         } elseif (!empty($product->new_price) && $product->new_price > 0) {
-            $finalPrice = $product->new_price;
-        } elseif (!empty($product->old_price) && $product->old_price > 0) {
-            $finalPrice = $product->old_price;
+            $finalPrice = $product->new_prie = $product->old_price;
         } else {
             $finalPrice = 1; // fallback price
         }
@@ -1061,7 +1061,7 @@ $brands = Brand::where('status', 1)
                 Session::put('shipping_id', $shipping->id);
             }
         }
-        return view('frontEnd.layouts.ajax.cart');
+        return view(\App\Http\Controllers\Frontend\ShoppingController::cartPartial());
     }
 
     public function contact()
@@ -1147,7 +1147,9 @@ $brands = Brand::where('status', 1)
             ->orderBy('products.id')
             ->get();
 
-        abort_if($products->isEmpty(), 404, 'No available product is assigned to this campaign.');
+        if ($products->isEmpty()) {
+            $products = collect();
+        }
 
         // A campaign is a single-product checkout flow. Start it with the deterministic
         // primary/first available product and safely handle products without an image.
@@ -1192,27 +1194,30 @@ $brands = Brand::where('status', 1)
 
         // Facebook CAPI ViewContent — server-side, event_id দিয়ে Pixel-এর সাথে deduplicate হবে
         $fb_view_content_event_id = 'vc_camp' . $campaign_data->id . '_' . time();
-        try {
-            $capiUserData = [
-                'client_ip_address' => request()->ip(),
-                'client_user_agent' => request()->userAgent(),
-            ];
-            if (isset($_COOKIE['_fbp'])) $capiUserData['fbp'] = $_COOKIE['_fbp'];
-            if (isset($_COOKIE['_fbc'])) $capiUserData['fbc'] = $_COOKIE['_fbc'];
-            app(\App\Services\FacebookCapiService::class)->sendViewContent([
-                'content_name' => strip_tags($campaign_data->name),
-                'content_ids'  => $products->pluck('id')->map(function($id) { return (string)$id; })->values()->toArray(),
-                'content_type' => 'product',
-                'value'        => (float) (optional($products->first())->new_price ?? 0),
-                'currency'     => 'BDT',
-                'num_items'    => $products->count(),
-            ], $capiUserData, [
-                'event_id'        => $fb_view_content_event_id,
-                'event_source_url' => request()->fullUrl(),
-            ]);
-        } catch (\Throwable $e) {
-            // Silently fail — page load block করবে না
-        }
+        $capiPayload = [
+            'content_name' => strip_tags($campaign_data->name),
+            'content_ids'  => $products->pluck('id')->map(fn ($id) => (string) $id)->values()->toArray(),
+            'content_type' => 'product',
+            'value'        => (float) (optional($products->first())->new_price ?? 0),
+            'currency'     => 'BDT',
+            'num_items'    => $products->count(),
+        ];
+        $capiUserData = [
+            'client_ip_address' => request()->ip(),
+            'client_user_agent' => request()->userAgent(),
+        ];
+        if (isset($_COOKIE['_fbp'])) $capiUserData['fbp'] = $_COOKIE['_fbp'];
+        if (isset($_COOKIE['_fbc'])) $capiUserData['fbc'] = $_COOKIE['_fbc'];
+        $capiUrl = request()->fullUrl();
+        dispatch(function () use ($capiPayload, $capiUserData, $fb_view_content_event_id, $capiUrl) {
+            try {
+                app(\App\Services\FacebookCapiService::class)->sendViewContent($capiPayload, $capiUserData, [
+                    'event_id' => $fb_view_content_event_id,
+                    'event_source_url' => $capiUrl,
+                ]);
+            } catch (\Throwable $e) {
+            }
+        })->afterResponse();
 
         $viewData = compact(
             'campaign_data',
@@ -1355,5 +1360,8 @@ $brands = Brand::where('status', 1)
         $categories = Category::where('status', 1)->where('parent_id', 0)->get();
 
         return view('frontEnd.layouts.pages.wholesale_products', compact('products', 'categories'));
+    }
+}
+.wholesale_products', compact('products', 'categories'));
     }
 }

@@ -44,9 +44,8 @@
             </a>
 
             <div class="flex-grow max-w-2xl hidden md:flex">
-                <form action="{{ route('home') }}" method="GET" class="flex w-full border-2 border-blue-600 rounded-lg overflow-hidden">
-                    <input type="hidden" name="search" value="1">
-                    <input type="text" name="q" placeholder="প্রোডাক্ট সার্চ করুন..." class="w-full px-4 py-2 outline-none">
+                <form action="{{ landing_url($landing->slug, '') }}" method="GET" class="flex w-full border-2 border-blue-600 rounded-lg overflow-hidden">
+                    <input type="text" name="q" value="{{ request('q') }}" placeholder="প্রোডাক্ট সার্চ করুন..." class="w-full px-4 py-2 outline-none">
                     <button type="submit" class="bg-blue-600 text-white px-6 hover:bg-blue-700 transition"><i class="fa-solid fa-magnifying-glass"></i></button>
                 </form>
             </div>
@@ -57,9 +56,8 @@
         </div>
 
         <div class="p-3 md:hidden">
-            <form action="{{ route('home') }}" method="GET" class="flex w-full border border-gray-300 rounded-lg overflow-hidden">
-                <input type="hidden" name="search" value="1">
-                <input type="text" name="q" placeholder="সার্চ করুন..." class="w-full px-3 py-2 outline-none text-sm">
+            <form action="{{ landing_url($landing->slug, '') }}" method="GET" class="flex w-full border border-gray-300 rounded-lg overflow-hidden">
+                <input type="text" name="q" value="{{ request('q') }}" placeholder="সার্চ করুন..." class="w-full px-3 py-2 outline-none text-sm">
                 <button type="submit" class="bg-blue-600 text-white px-4"><i class="fa-solid fa-magnifying-glass"></i></button>
             </form>
         </div>
@@ -201,11 +199,13 @@
     </div>
 
     {{-- Products Section --}}
-    @if($products->count() > 0)
     <section class="container mx-auto px-4 py-8">
+    @if($products->count() > 0)
         <div class="flex justify-between items-center mb-6 border-b pb-2">
-            <h2 class="text-xl md:text-2xl font-bold text-gray-800 border-b-4 border-blue-600 inline-block pb-1">রিসেলার হট প্রোডাক্টস</h2>
-            <a href="{{ route('home') }}" class="text-blue-600 text-sm font-semibold hover:underline">সব দেখুন <i class="fa-solid fa-angle-right"></i></a>
+            <h2 class="text-xl md:text-2xl font-bold text-gray-800 border-b-4 border-blue-600 inline-block pb-1">{{ request('q') ? 'সার্চ রেজাল্ট' : 'রিসেলার হট প্রোডাক্টস' }}</h2>
+            @if(!request()->boolean('all') && !request('q'))
+            <a href="{{ landing_url($landing->slug, '') }}?all=1" class="text-blue-600 text-sm font-semibold hover:underline">সব দেখুন <i class="fa-solid fa-angle-right"></i></a>
+            @endif
         </div>
 
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
@@ -240,8 +240,12 @@
                 </div>
             @endforeach
         </div>
-    </section>
+    @else
+        <div class="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+            {{ request('q') ? 'এই সার্চের সাথে মিলে এমন কোনো প্রোডাক্ট পাওয়া যায়নি।' : 'এখনো কোনো প্রোডাক্ট যোগ করা হয়নি।' }}
+        </div>
     @endif
+    </section>
 
     {{-- Footer --}}
     <footer class="relative mt-16 overflow-hidden">

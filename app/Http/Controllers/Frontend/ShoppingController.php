@@ -367,7 +367,7 @@ class ShoppingController extends Controller
         ]);
 
         $data = Cart::instance('shopping')->content();
-        return view('frontEnd.layouts.ajax.cart', compact('data'));
+        return view(self::cartPartial(), compact('data'));
     }
 
     // 🟢 Remove from cart
@@ -375,7 +375,7 @@ class ShoppingController extends Controller
     {
         Cart::instance('shopping')->update($request->id, 0);
         $data = Cart::instance('shopping')->content();
-        return view('frontEnd.layouts.ajax.cart', compact('data'));
+        return view(self::cartPartial(), compact('data'));
     }
 
     // 🟢 Increment quantity
@@ -398,19 +398,22 @@ class ShoppingController extends Controller
         Cart::instance('shopping')->update($request->id, $qty);
 
         $data = Cart::instance('shopping')->content();
-        return view('frontEnd.layouts.ajax.cart', compact('data'));
+        return view(self::cartPartial(), compact('data'));
     }
 
     // 🟢 Decrement quantity
     public function cart_decrement(Request $request)
     {
         $item = Cart::instance('shopping')->get($request->id);
+        if (!$item) {
+            return response()->json(['message' => 'Cart item not found.'], 404);
+        }
         $qty  = max(1, $item->qty - 1); // ১ এর নিচে নামবে না
 
         Cart::instance('shopping')->update($request->id, $qty);
 
         $data = Cart::instance('shopping')->content();
-        return view('frontEnd.layouts.ajax.cart', compact('data'));
+        return view(self::cartPartial(), compact('data'));
     }
 
     // 🟢 Cart count (header)
@@ -472,6 +475,23 @@ class ShoppingController extends Controller
         ]);
 
         $data = Cart::instance('shopping')->content();
-        return view('frontEnd.layouts.ajax.cart', compact('data'));
+        return view(self::cartPartial(), compact('data'));
+    }
+
+    /**
+     * Campaign landing pages need a script-free cart table that keeps
+     * the same columns as the checkout UI. The main store cart partial
+     * injects jQuery handlers and a delete column, which breaks those pages.
+     */
+    public static function cartPartial(): string
+    {
+        $referer = (string) request()->headers->get('referer', '');
+        $isCampaign = request()->boolean('campaign')
+            || request()->header('X-Campaign-Page')
+            || str_contains($referer, '/campaign/');
+
+        return $isCampaign
+            ? 'frontEnd.layouts.ajax.campaign-cart'
+            : 'frontEnd.layouts.ajax.cart';
     }
 }

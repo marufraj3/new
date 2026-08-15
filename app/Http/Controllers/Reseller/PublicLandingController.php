@@ -37,10 +37,8 @@ class PublicLandingController extends Controller
         }
         return Product::whereIn('id', $productIds)
             ->where('status', 1)
-            ->when(function ($q) {
-                if (\Schema::hasColumn('products', 'approval_status')) {
-                    $q->where('approval_status', 'approved');
-                }
+            ->when(\Schema::hasColumn('products', 'approval_status'), function ($q) {
+                $q->where('approval_status', 'approved');
             })
             ->with('image');
     }
@@ -52,17 +50,21 @@ class PublicLandingController extends Controller
         $productIds = $this->baseProductIds($landing);
         $products = collect();
         if (!empty($productIds)) {
-            $products = Product::whereIn('id', $productIds)
+            $keyword = trim((string) request('q', ''));
+            $showAll = request()->boolean('all') || $keyword !== '';
+
+            $query = Product::whereIn('id', $productIds)
                 ->where('status', 1)
-                ->when(function ($q) {
-                    if (\Schema::hasColumn('products', 'approval_status')) {
-                        $q->where('approval_status', 'approved');
-                    }
+                ->when(\Schema::hasColumn('products', 'approval_status'), function ($q) {
+                    $q->where('approval_status', 'approved');
+                })
+                ->when($keyword !== '', function ($q) use ($keyword) {
+                    $q->where('name', 'like', '%' . $keyword . '%');
                 })
                 ->with('image')
-                ->orderBy('created_at', 'desc')
-                ->limit(10)
-                ->get();
+                ->orderBy('created_at', 'desc');
+
+            $products = $showAll ? $query->limit(80)->get() : $query->limit(10)->get();
         }
 
         $categories = Category::where('status', 1)->where('parent_id', 0)->with('subcategories')->orderBy('name')->get();

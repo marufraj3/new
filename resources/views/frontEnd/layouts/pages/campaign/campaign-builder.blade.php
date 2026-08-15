@@ -11,7 +11,7 @@
         $campName = strip_tags($campaign_data->name ?? '');
         $campId = (string) $campaign_data->id;
         $firstProduct = $products->first();
-        $campValue = (float) ($firstProduct->new_price ?? 0);
+        $campValue = (float) ($firstProduct?->new_price ?? 0);
         $campaignImage = $campaign_data->image_one ?: ($campaign_data->banner ?: optional($firstProduct?->image)->image);
         $campaignDescription = strip_tags($campaign_data->short_description ?: ($campaign_data->description ?? ''));
         $discount = $firstProduct && (float) $firstProduct->old_price > (float) $firstProduct->new_price
@@ -24,9 +24,9 @@
                 'price' => (float) $product->new_price,
                 'old_price' => (float) $product->old_price,
                 'image' => asset(optional($product->image)->image ?? 'public/uploads/default.webp'),
-                'sizes' => $product->sizes->map(fn ($size) => ['id' => (string) $size->id, 'name' => $size->sizeName ?? $size->size_name ?? $size->name ?? ''])->values(),
-                'colors' => $product->colors->map(fn ($color) => ['id' => (string) $color->id, 'name' => $color->colorName ?? $color->color_name ?? $color->name ?? '', 'hex' => $color->color ?? ''])->values(),
-                'variants' => $product->variantPrices->map(fn ($variant) => [
+                'sizes' => optional($product->sizes)->map(fn ($size) => ['id' => (string) $size->id, 'name' => $size->sizeName ?? $size->size_name ?? $size->name ?? ''])->values() ?? collect(),
+                'colors' => optional($product->colors)->map(fn ($color) => ['id' => (string) $color->id, 'name' => $color->colorName ?? $color->color_name ?? $color->name ?? '', 'hex' => $color->color ?? ''])->values() ?? collect(),
+                'variants' => optional($product->variantPrices)->map(fn ($variant) => [
                     'size_id' => $variant->size_id ? (string) $variant->size_id : null,
                     'color_id' => $variant->color_id ? (string) $variant->color_id : null,
                     'price' => (float) $variant->price,
@@ -44,20 +44,20 @@
             '{{campaign.deadline}}' => e($campaign_data->deadline ?? ''),
             '{{campaign.description}}' => e($campaignDescription),
             '{{campaign.image}}' => e($campaignImage ? asset($campaignImage) : ''),
-            '{{product.name}}' => e($firstProduct->name ?? ''),
-            '{{product.title}}' => e($firstProduct->name ?? ''),
-            '{{product.slug}}' => e($firstProduct->slug ?? ''),
-            '{{product.price}}' => e(number_format((float) ($firstProduct->new_price ?? 0), 0)),
-            '{{product.old_price}}' => e(number_format((float) ($firstProduct->old_price ?? 0), 0)),
+            '{{product.name}}' => e($firstProduct?->name ?? ''),
+            '{{product.title}}' => e($firstProduct?->name ?? ''),
+            '{{product.slug}}' => e($firstProduct?->slug ?? ''),
+            '{{product.price}}' => e(number_format((float) ($firstProduct?->new_price ?? 0), 0)),
+            '{{product.old_price}}' => e(number_format((float) ($firstProduct?->old_price ?? 0), 0)),
             '{{product.discount}}' => e(number_format($discount, 0)),
             '{{product.image}}' => e($firstProduct ? asset(optional($firstProduct->image)->image ?? 'public/uploads/default.webp') : ''),
-            '{{contact.phone}}' => e($contact->phone ?? ''),
-            '{{contact.whatsapp}}' => e($contact->whatsapp ?? ''),
+            '{{contact.phone}}' => e(optional($contact)->phone ?? ''),
+            '{{contact.whatsapp}}' => e(optional($contact)->whatsapp ?? ''),
         ];
-        $publishedHtml = strtr($campaign_data->page_html, $tokenValues);
+        $publishedHtml = strtr((string) ($campaign_data->page_html ?? ''), $tokenValues);
     @endphp
 
-    <title>{{ $campName }} — {{ $generalsetting->name }}</title>
+    <title>{{ $campName }} — {{ optional($generalsetting)->name }}</title>
     <meta name="description" content="{{ $campaignDescription }}">
     <meta name="robots" content="index, follow">
     <meta property="og:type" content="product">
@@ -65,7 +65,7 @@
     <meta property="og:description" content="{{ $campaignDescription }}">
     <meta property="og:url" content="{{ route('campaign', $campaign_data->slug) }}">
     @if($campaignImage)<meta property="og:image" content="{{ asset($campaignImage) }}">@endif
-    <link rel="shortcut icon" href="{{ asset($generalsetting->favicon) }}" type="image/x-icon">
+    <link rel="shortcut icon" href="{{ asset(optional($generalsetting)->favicon) }}" type="image/x-icon">
     <link rel="stylesheet" href="{{ asset('public/frontEnd/campaign/css/all.css') }}">
     <link rel="stylesheet" href="{{ asset('public/frontEnd/campaign/css/bootstrap.min.css') }}">
     <link rel="stylesheet" href="{{ asset('public/frontEnd/css/campaign-page-renderer.css') }}">

@@ -22,18 +22,18 @@
 
 @extends('frontEnd.layouts.master')
 
-@section('title', $seo->meta_title ?? ($generalsetting->name ?? 'Home'))
+@section('title', optional($seo)->meta_title ?? ($generalsetting->name ?? 'Home'))
 
 @push('seo')
 <meta name="app-url" content="{{ url('/') }}" />
 <meta name="robots" content="index, follow" />
-<meta name="description" content="{{ $seo->meta_description ?? '' }}" />
-<meta name="keywords" content="{{ $seo->meta_tags ?? '' }}" />
-<meta property="og:title" content="{{ $seo->meta_title ?? '' }}" />
+<meta name="description" content="{{ optional($seo)->meta_description ?? '' }}" />
+<meta name="keywords" content="{{ optional($seo)->meta_tags ?? '' }}" />
+<meta property="og:title" content="{{ optional($seo)->meta_title ?? '' }}" />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="{{ url()->current() }}" />
 <meta property="og:image" content="{{ asset($generalsetting->og_baner ?? 'public/logo.png') }}" />
-<meta property="og:description" content="{{ $seo->meta_description ?? '' }}" />
+<meta property="og:description" content="{{ optional($seo)->meta_description ?? '' }}" />
 @endpush
 
 @section('content')
@@ -426,6 +426,18 @@
 .cd-top.on{opacity:1;pointer-events:auto;}
 
 /* ============ RESPONSIVE ============ */
+.cd-hero.is-solo{grid-template-columns:1fr;}
+.cd-blogs{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;}
+.cd-blog{background:#fff;border:1px solid var(--cd-line);border-radius:var(--cd-radius);overflow:hidden;display:flex;flex-direction:column;transition:.25s;}
+.cd-blog:hover{transform:translateY(-5px);box-shadow:var(--cd-shadow-lg);}
+.cd-blog img{width:100%;aspect-ratio:16/10;object-fit:cover;}
+.cd-blog-body{padding:12px 14px 16px;display:flex;flex-direction:column;gap:8px;flex:1;}
+.cd-blog-body h3{margin:0;font-size:16px;font-weight:700;line-height:1.35;}
+.cd-blog-body p{margin:0;font-size:13px;color:var(--cd-muted);line-height:1.5;}
+.cd-blog-meta{font-size:12px;color:var(--cd-muted);}
+.cd-reviews{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;}
+.cd-reviews a{border-radius:var(--cd-radius);overflow:hidden;box-shadow:var(--cd-shadow);display:block;}
+.cd-reviews img{width:100%;height:100%;object-fit:cover;}
 @media(max-width:1100px){
     .cd-hero{grid-template-columns:minmax(0,1fr) minmax(0,340px);}
 }
@@ -464,12 +476,12 @@
 
 {{-- ---------- হিরো : বড় স্লাইডার + ডানপাশে ২টা ব্যানার ---------- --}}
 <div class="cd-wrap">
-    <div class="cd-hero">
+    <div class="cd-hero {{ collect($sliderbottomads ?? [])->take(2)->isEmpty() ? 'is-solo' : '' }}">
 
         <div class="cd-slider" id="cdSlider">
             <div class="cd-slides" id="cdSlides">
                 @forelse ($sliders as $s)
-                <a href="{{ $s->link ?: '#' }}"><img src="{{ asset($s->image) }}" alt="slider"></a>
+                <a href="{{ $s->link ?: '#' }}"><img src="{{ asset($s->image) }}" alt="slider" @if($loop->first) fetchpriority="high" @else loading="lazy" @endif></a>
                 @empty
                 <div><img src="{{ asset($generalsetting->og_baner ?? 'public/logo.png') }}" alt="slider"></div>
                 @endforelse
@@ -480,27 +492,18 @@
         </div>
 
         @php
-            $cdSideBanners = [
-                [
-                    'image' => 'https://ecommerce4.creativedesign.com.bd/public/uploads/banner/1783342266-6a4ba4ba14809-captan-fashion-banner-fa8ebb88ff.webp',
-                    'link'  => url('#'),
-                    'alt'   => 'Polo T-Shirt Collection',
-                ],
-                [
-                    'image' => 'https://ecommerce4.creativedesign.com.bd/public/uploads/banner/1783342291-6a4ba4d356321-website-banner-71c5d21967.webp',
-                    'link'  => url('/'),
-                    'alt'   => 'Premium Quality Tracksuit',
-                ],
-            ];
+            $cdSideBanners = collect($sliderbottomads ?? [])->take(2);
         @endphp
 
+        @if($cdSideBanners->count())
         <div class="cd-hero-side">
             @foreach($cdSideBanners as $sb)
-            <a href="{{ $sb['link'] }}">
-                <img src="{{ asset($sb['image']) }}" alt="{{ $sb['alt'] }}" loading="lazy">
+            <a href="{{ $sb->link ?: '#' }}">
+                <img src="{{ asset($sb->image) }}" alt="Promo banner" loading="lazy">
             </a>
             @endforeach
         </div>
+        @endif
 
     </div>
 </div>
@@ -524,6 +527,27 @@
 </div></section>
 @endif
 
+{{-- ---------- হিরো-নিচের অতিরিক্ত ব্যানার + হোমপেজ অ্যাড ---------- --}}
+@php
+    $cdExtraBottomAds = collect($sliderbottomads ?? [])->skip(2)->values();
+@endphp
+@if($cdExtraBottomAds->count())
+<section class="cd-sec"><div class="cd-wrap">
+    <div class="cd-ads cd-ads-{{ min(4, $cdExtraBottomAds->count()) }}">
+        @foreach($cdExtraBottomAds as $ad)
+        <a href="{{ $ad->link ?: '#' }}"><img src="{{ asset($ad->image) }}" alt="Promo banner" loading="lazy"></a>
+        @endforeach
+    </div>
+</div></section>
+@endif
+
+@if(isset($homepageads) && $homepageads->count())
+<section class="cd-sec"><div class="cd-wrap"><div class="cd-ad-full">
+    @foreach($homepageads as $ad)
+    <a href="{{ $ad->link ?: '#' }}"><img src="{{ asset($ad->image) }}" alt="Homepage banner" loading="lazy"></a>
+    @endforeach
+</div></div></section>
+@endif
 
 {{-- ============================================================
      PART 7 : FLASH SALE (কাউন্টডাউন + প্রোডাক্ট)
@@ -660,6 +684,15 @@
 </div></section>
 @endif
 
+{{-- ---------- দ্বিতীয় হোমপেজ অ্যাড ---------- --}}
+@if(isset($homepageads2) && $homepageads2->count())
+<section class="cd-sec"><div class="cd-wrap"><div class="cd-ad-full">
+    @foreach($homepageads2 as $ad)
+    <a href="{{ $ad->link ?: '#' }}"><img src="{{ asset($ad->image) }}" alt="Homepage banner" loading="lazy"></a>
+    @endforeach
+</div></div></section>
+@endif
+
 {{-- ============================================================
      PART 13 : ব্র্যান্ড
      ============================================================ --}}
@@ -695,6 +728,48 @@
             <small>⭐ {{ $v->average_rating ?? 0 }} ({{ $v->total_reviews ?? 0 }}) • {{ $v->products_count ?? 0 }} Products</small>
             <span class="cd-visit">Visit Shop</span>
         </a>
+        @endforeach
+    </div>
+</div></section>
+@endif
+
+@if(isset($reviews) && $reviews->count())
+<section class="cd-sec"><div class="cd-wrap">
+    <div class="cd-head"><h2>Customer Reviews</h2></div>
+    <div class="cd-reviews">
+        @foreach($reviews as $review)
+        <a href="{{ $review->link ?: '#' }}"><img src="{{ asset($review->image) }}" alt="Customer review" loading="lazy"></a>
+        @endforeach
+    </div>
+</div></section>
+@endif
+
+@if(isset($blogs) && $blogs->count())
+<section class="cd-sec"><div class="cd-wrap">
+    <div class="cd-head">
+        <h2>Latest Blog</h2>
+        <a class="cd-viewall" href="{{ route('blogs') }}">View All</a>
+    </div>
+    <div class="cd-blogs">
+        @foreach($blogs as $blog)
+        <a class="cd-blog" href="{{ route('blog.details', $blog->slug) }}">
+            <img src="{{ $blog->image ? url('public/'.$blog->image) : asset('public/uploads/default.webp') }}" alt="{{ $blog->title }}" loading="lazy">
+            <div class="cd-blog-body">
+                <div class="cd-blog-meta">{{ optional($blog->created_at)->format('d M Y') }}</div>
+                <h3>{{ \Illuminate\Support\Str::limit($blog->title, 60) }}</h3>
+                <p>{{ \Illuminate\Support\Str::limit(strip_tags($blog->short_description ?? ''), 110) }}</p>
+            </div>
+        </a>
+        @endforeach
+    </div>
+</div></section>
+@endif
+
+@if(isset($footertopads) && $footertopads->count())
+<section class="cd-sec"><div class="cd-wrap">
+    <div class="cd-ads cd-ads-{{ min(4, $footertopads->count()) }}">
+        @foreach($footertopads as $ad)
+        <a href="{{ $ad->link ?: '#' }}"><img src="{{ asset($ad->image) }}" alt="Promo banner" loading="lazy"></a>
         @endforeach
     </div>
 </div></section>
