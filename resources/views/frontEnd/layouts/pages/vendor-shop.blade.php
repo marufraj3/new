@@ -186,10 +186,10 @@
                         @if (!$value->prosizes->isEmpty() || !$value->procolors->isEmpty())
                             {{-- Variant product – go to detail page --}}
                             <div class="pro_btn">
-                                <a href="{{ route('product', $value->slug) }}" class="order-btn-link">
+                                <a href="{{ route('product', $value->slug) }}" data-id="{{ $value->id }}" class="order-btn-link qo-order-link">
                                     অর্ডার করুন
                                 </a>
-                                <a href="{{ route('product', $value->slug) }}" class="cart-icon-link">
+                                <a href="{{ route('product', $value->slug) }}" data-id="{{ $value->id }}" class="cart-icon-link qo-cart-link">
                                     <i class="fa-solid fa-cart-shopping"></i>
                                 </a>
                             </div>

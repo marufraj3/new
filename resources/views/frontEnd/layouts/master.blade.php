@@ -2282,5 +2282,9 @@ document.getElementById("sidebarCartOverlay")?.addEventListener("click", closeSi
     }
 </style>
 @endif
+
+    {{-- ⚡ Global Quick-Order Popup (Order Now / Cart বাটনে ক্লিকে পপআপ) --}}
+    @include('frontEnd.layouts.partials.quick-order-modal')
+
     </body>
 </html>

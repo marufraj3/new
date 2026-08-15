@@ -930,6 +930,84 @@ $brands = Brand::where('status', 1)
         }
     }
 
+    /**
+     * 🔥 Quick-Order পপআপের জন্য প্রোডাক্ট ডাটা JSON আকারে return করে।
+     * Order Now / Cart বাটনে ক্লিক করলে এখান থেকে সাইজ/কালার/ভ্যারিয়েন্ট দাম আসে
+     * (হোমপেজে embedded `CDP` ডাটা থাকলে সে ডাটাই ব্যবহার হয় — দ্রুত হয়)।
+     */
+    public function quickOrderData($id)
+    {
+        $p = Product::where(['id' => $id, 'status' => 1, 'approval_status' => 'approved'])
+            ->with(['image', 'variantPrices.color', 'variantPrices.size', 'prosizes', 'procolors'])
+            ->first();
+
+        if (!$p) {
+            return response()->json(['error' => 'Product not found'], 404);
+        }
+
+        $img = optional($p->image)->image
+            ?? DB::table('productimages')->where('product_id', $p->id)->value('image')
+            ?? 'public/uploads/default.webp';
+
+        $url          = route('product', $p->slug);
+        $displayStock = !empty($p->is_wholesale) ? 99999 : (int) ($p->stock ?? 0);
+
+        $sizes = []; $colors = []; $variants = [];
+
+        if ($p->variantPrices && $p->variantPrices->count()) {
+            foreach ($p->variantPrices as $v) {
+                $variants[] = [
+                    's'  => $v->size_id  ? (int) $v->size_id  : null,
+                    'c'  => $v->color_id ? (int) $v->color_id : null,
+                    'p'  => (float) $v->price,
+                    'st' => $v->stock === null ? null : (int) $v->stock,
+                ];
+                if ($v->size_id && $v->size) {
+                    if (!isset($sizes[$v->size_id])) {
+                        $sizes[$v->size_id] = ['id' => (int) $v->size_id, 'name' => $v->size->sizeName, 'stock' => 0, 'has_stock' => false];
+                    }
+                    if ($v->stock !== null) {
+                        $sizes[$v->size_id]['stock']   += max(0, (int) $v->stock);
+                        $sizes[$v->size_id]['has_stock'] = true;
+                    }
+                }
+                if ($v->color_id && $v->color) {
+                    $colors[$v->color_id] = ['id' => (int) $v->color_id, 'name' => $v->color->colorName, 'hex' => $v->color->color];
+                }
+            }
+        }
+
+        // ফলব্যাক — পুরনো productsizes / productcolors টেবিল
+        if (empty($sizes) && $p->prosizes && $p->prosizes->count()) {
+            foreach ($p->prosizes as $ps) {
+                $sz = $ps->size ?? null;
+                if ($sz) { $sizes[$sz->id] = ['id' => (int) $sz->id, 'name' => $sz->sizeName]; }
+            }
+        }
+        if (empty($colors) && $p->procolors && $p->procolors->count()) {
+            foreach ($p->procolors as $pc) {
+                $cl = $pc->color ?? null;
+                if ($cl) { $colors[$cl->id] = ['id' => (int) $cl->id, 'name' => $cl->colorName, 'hex' => $cl->color]; }
+            }
+        }
+
+        $sizes  = array_values($sizes);
+        $colors = array_values($colors);
+
+        return response()->json([
+            'id'       => $p->id,
+            'name'     => $p->name,
+            'img'      => $img,
+            'url'      => $url,
+            'price'    => (float) $p->new_price,
+            'old'      => (float) ($p->old_price ?? 0),
+            'stock'    => $displayStock,
+            'sizes'    => $sizes,
+            'colors'   => $colors,
+            'variants' => $variants,
+        ]);
+    }
+
     public function livesearch(Request $request)
     {
         $products = Product::select('id', 'name', 'slug', 'new_price', 'old_price','stock')

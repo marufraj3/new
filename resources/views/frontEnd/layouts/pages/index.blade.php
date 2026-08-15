@@ -720,7 +720,7 @@
     <div class="cd-mo-bg" onclick="cdCloseMo()"></div>
     <div class="cd-mo-box">
         <div class="cd-mo-head">
-            <h5>🛒 দ্রুত অর্ডার করুন</h5>
+            <h5>{{ $generalsetting->quick_order_popup_title ?? '🛒 দ্রুত অর্ডার করুন' }}</h5>
             <button class="cd-mo-x" type="button" onclick="cdCloseMo()">✕</button>
         </div>
 
@@ -769,8 +769,8 @@
                 </div>
 
                 <div class="cd-mo-btns">
-                    <button type="submit" class="cd-confirm" id="cdMoConfirm">অর্ডার কনফার্ম করুন →</button>
-                    <button type="button" class="cd-addcart" onclick="cdMoAddCart()">কার্টে রাখুন</button>
+                    <button type="submit" class="cd-confirm" id="cdMoConfirm">{{ $generalsetting->quick_order_confirm_text ?? 'অর্ডার কনফার্ম করুন →' }}</button>
+                    <button type="button" class="cd-addcart" onclick="cdMoAddCart()">{{ $generalsetting->quick_order_cart_text ?? 'কার্টে রাখুন' }}</button>
                 </div>
 
                 <div class="cd-trust">
@@ -875,8 +875,21 @@
     var mo  = document.getElementById('cdMo');
     var cd  = { p:null, size:null, color:null, qty:1, price:0, stock:0, cartOnly:false };
 
+    /* Admin থেকে পপআপ সেটিংস (shared partial এ `CDQuickOrder` না থাকলে নিজে সেট) */
+    if(!window.CDQuickOrder) window.CDQuickOrder = {
+        enabled:    {{ (int)(($generalsetting->quick_order_popup_enabled ?? 1) == 1) ? 'true' : 'false' }},
+        confirmText: @json($generalsetting->quick_order_confirm_text ?? 'অর্ডার কনফার্ম করুন →'),
+        cartText:    @json($generalsetting->quick_order_cart_text ?? 'কার্টে যোগ করুন')
+    };
+
     window.cdOrder = function(id, cartOnly){
         var p = CDP[id]; if(!p){ return; }
+        /* Admin পপআপ বন্ধ করলে সাইজ/কালার এর জন্য ডিটেইলস পেজে পাঠাবে */
+        if(window.CDQuickOrder && window.CDQuickOrder.enabled === false){
+            if(cartOnly){ window.location.href = "{{ route('cart.show') }}"; return; }
+            window.location.href = p.url;
+            return;
+        }
         cd = { p:p, size:null, color:null, qty:1, price:p.price, stock:p.stock, cartOnly: !!cartOnly };
 
         document.getElementById('cdMoId').value    = p.id;
@@ -889,7 +902,7 @@
 
         var btn = document.getElementById('cdMoConfirm');
         btn.disabled = false;
-        btn.textContent = cd.cartOnly ? 'কার্টে যোগ করুন' : 'অর্ডার কনফার্ম করুন →';
+        btn.textContent = cd.cartOnly ? window.CDQuickOrder.cartText : window.CDQuickOrder.confirmText;
 
         buildChips('cdMoSizes',  'cdMoSizeWrap',  p.sizes,  'size');
         buildChips('cdMoColors', 'cdMoColorWrap', p.colors, 'color');

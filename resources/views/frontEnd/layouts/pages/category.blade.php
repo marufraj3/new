@@ -251,13 +251,15 @@
                                     <div class="pro_btn">
                                         {{-- বড় অর্ডার বাটন --}}
                                         <a href="{{ route('product', $value->slug) }}"
-                                           class="order-btn-link order-btn">
+                                           data-id="{{ $value->id }}"
+                                           class="order-btn-link order-btn qo-order-link">
                                             অর্ডার করুন
                                         </a>
 
                                         {{-- ছোট কার্ট আইকন বাটন --}}
                                         <a href="{{ route('product', $value->slug) }}"
-                                           class="cart-icon-link cart-icon-btn">
+                                           data-id="{{ $value->id }}"
+                                           class="cart-icon-link cart-icon-btn qo-cart-link">
                                             <i class="fa-solid fa-cart-shopping"></i>
                                         </a>
                                     </div>

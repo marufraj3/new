@@ -235,6 +235,7 @@ class GeneralSettingController extends Controller
         $input['vendor_enabled'] = $request->has('vendor_enabled') ? 1 : 0;
         $input['reseller_enabled'] = $request->has('reseller_enabled') ? 1 : 0;
         $input['news_ticker_enabled'] = $request->has('news_ticker_enabled') ? 1 : 0;
+        $input['quick_order_popup_enabled'] = $request->has('quick_order_popup_enabled') ? 1 : 0;
         
         $update_data->update($input);
 

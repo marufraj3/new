@@ -298,6 +298,53 @@
                 </div>
             </div>
 
+            <div class="col-12">
+                <div class="settings-card">
+                    <div class="section-title-pro">
+                        <i class="mdi mdi-shopping text-warning"></i> Quick Order Popup (দ্রুত অর্ডার পপআপ)
+                    </div>
+                    <div class="p-4">
+                        <p class="text-muted small mb-3">
+                            ফ্রন্টএন্ডে <strong>"অর্ডার করুন"</strong> বা <strong>কার্ট</strong> বাটনে ক্লিক করলে এই পপআপ
+                            দেখাবে — গ্রাহক সাইট ছেড়ে না গিয়েই সাইজ/কালার/পরিমাণ সিলেক্ট করে সরাসরি অর্ডার/কার্টে যোগ করতে পারবে।
+                            (হাই-কনভার্টিং, ফাস্ট, রেস্পন্সিভ)
+                        </p>
+                        <div class="row g-3">
+                            <div class="col-md-4 mb-3">
+                                <div class="form-check form-switch mt-2">
+                                    <input class="form-check-input" type="checkbox" name="quick_order_popup_enabled" value="1" id="qoEnabled"
+                                        {{ ($edit_data->quick_order_popup_enabled ?? 1) == 1 ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="qoEnabled">
+                                        <strong>Quick Order Popup চালু</strong>
+                                    </label>
+                                </div>
+                                <small class="text-muted">বন্ধ করলে আগের মতো সরাসরি কার্ট/চেকআউটে যাবে।</small>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label-pro">পপআপ টাইটেল</label>
+                                <input type="text" name="quick_order_popup_title" class="form-control custom-input"
+                                       value="{{ $edit_data->quick_order_popup_title ?? '🛒 দ্রুত অর্ডার করুন' }}">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label-pro">কনফার্ম বাটন টেক্সট</label>
+                                <input type="text" name="quick_order_confirm_text" class="form-control custom-input"
+                                       value="{{ $edit_data->quick_order_confirm_text ?? 'অর্ডার কনফার্ম করুন →' }}">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label-pro">কার্ট বাটন টেক্সট</label>
+                                <input type="text" name="quick_order_cart_text" class="form-control custom-input"
+                                       value="{{ $edit_data->quick_order_cart_text ?? 'কার্টে রাখুন' }}">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label-pro">কার্টে যোগের সাফল্য বার্তা</label>
+                                <input type="text" name="quick_order_cart_toast" class="form-control custom-input"
+                                       value="{{ $edit_data->quick_order_cart_toast ?? 'কার্টে যোগ হয়েছে ✔' }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="col-12 text-center mb-5">
                 <button type="submit" class="btn-save-pro">
                     <i class="mdi mdi-content-save-all me-2"></i> Update Global Settings
