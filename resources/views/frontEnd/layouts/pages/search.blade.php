@@ -119,10 +119,10 @@
                             {{-- 🔥 UPDATED BUTTON SECTION (NOTHING REMOVED) --}}
                             @if (!$value->prosizes->isEmpty() || !$value->procolors->isEmpty())
                                 <div class="pro_btn">
-                                    <a href="{{ route('product', $value->slug) }}" class="addcartbutton">
+                                    <a href="{{ route('product', $value->slug) }}" data-id="{{ $value->id }}" class="addcartbutton qo-order-link">
                                         <span>অর্ডার করুন</span>
                                     </a>
-                                    <a href="{{ route('product', $value->slug) }}" class="cart-icon-btn">
+                                    <a href="{{ route('product', $value->slug) }}" data-id="{{ $value->id }}" class="cart-icon-btn qo-cart-link">
                                         <i class="fa-solid fa-cart-shopping"></i>
                                     </a>
                                 </div>
