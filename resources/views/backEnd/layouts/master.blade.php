@@ -499,6 +499,25 @@
 </li>
 @endcanany
 
+{{-- 📦 স্টক অ্যালার্ট — কোন প্রোডাক্ট ফুরিয়ে গেছে --}}
+@php
+    $stockAlertCount = 0;
+    try {
+        $stockAlertCount = app(\App\Services\StockAlertService::class)->unreadCount();
+    } catch (\Throwable $e) {
+        $stockAlertCount = 0;
+    }
+@endphp
+<li>
+  <a href="{{ route('admin.stock_alerts.index') }}">
+    <i data-feather="alert-triangle"></i>
+    <span> Stock Alerts </span>
+    @if ($stockAlertCount > 0)
+      <span class="badge badge-danger ml-1">{{ $stockAlertCount }}</span>
+    @endif
+  </a>
+</li>
+
 
 
 

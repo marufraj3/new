@@ -831,28 +831,24 @@ public function order_save(Request $request)
         }
 
         /* ─────────────────────────────────────────────────────────────────
-         * অর্ডার রেস্ট্রিকশন — আপাতত বন্ধ (ইচ্ছাকৃতভাবে)।
+         * অর্ডার রেস্ট্রিকশন v2 — শুধু ফোন নম্বর দিয়ে গণনা।
          *
-         * কেন বন্ধ: enforcement টি ফোন নম্বরের পাশাপাশি IP দিয়েও ম্যাচ করত।
-         * বাংলাদেশে মোবাইল অপারেটরের CGNAT আর অফিস/হোস্টেলের শেয়ার্ড ওয়াইফাইয়ে
-         * বহু আলাদা কাস্টমার একই পাবলিক IP থেকে আসে — ফলে একজনের অর্ডার
-         * সম্পূর্ণ অপরিচিত আরেকজনের অর্ডার আটকে দিতে পারত। ভুয়া অর্ডার
-         * ঠেকানোর চেয়ে আসল বিক্রি হারানোর ঝুঁকিই বেশি ছিল।
+         * v1-এ IP ঠিকানা দিয়েও ম্যাচ করা হতো, যা CGNAT/শেয়ার্ড ওয়াইফাইয়ে
+         * নির্দোষ কাস্টমারকে আটকে দিত — সেই অংশটি বাদ দেওয়া হয়েছে।
          *
-         * সার্ভিস ক্লাস, অ্যাডমিন সেটিংস পেজ ও ডেটাবেস কলামগুলো অক্ষত আছে —
-         * শুধু চেকআউটে প্রয়োগ করা হচ্ছে না। আবার চালু করতে হলে নিচের ব্লকটি
-         * আন-কমেন্ট করলেই হবে (তার আগে OrderRestrictionService থেকে IP
-         * ম্যাচিং অংশটুকু বাদ দিয়ে শুধু ফোন নম্বরে সীমাবদ্ধ করার পরামর্শ থাকল)।
+         * এখন এটি চালু হয় শুধু তখনই যখন অ্যাডমিন সেটিংস পেজ থেকে স্পষ্টভাবে
+         * সুইচটি চালু করে (general_settings.order_limit_enabled)। হোয়াইটলিস্ট
+         * করা নম্বর (রিসেলার/পাইকারি ক্রেতা) কখনোই আটকাবে না।
          * ───────────────────────────────────────────────────────────────── */
-        // $restrictionMessage = app(\App\Services\OrderRestrictionService::class)
-        //     ->violationMessage($request->phone, $request->ip());
-        //
-        // if ($restrictionMessage) {
-        //     Toastr::error($restrictionMessage, 'অর্ডার সীমা অতিক্রান্ত!');
-        //     return redirect()->back()
-        //         ->withErrors(['order_limit' => $restrictionMessage])
-        //         ->withInput();
-        // }
+        $restrictionMessage = app(\App\Services\OrderRestrictionService::class)
+            ->violationMessage($request->phone);
+
+        if ($restrictionMessage) {
+            Toastr::error($restrictionMessage, 'অর্ডার সীমা অতিক্রান্ত!');
+            return redirect()->back()
+                ->withErrors(['order_limit' => $restrictionMessage])
+                ->withInput();
+        }
 
         // ⭐ ভ্যারিয়েন্ট (সাইজ/কালার) ভ্যালিডেশন — অর্ডারের আগে স্টক নিশ্চিত করি
         foreach (Cart::instance('shopping')->content() as $cartItem) {
@@ -881,9 +877,47 @@ public function order_save(Request $request)
                     ->first();
 
             if ($variant && $variant->stock !== null && (int) $variant->stock < (int) $cartItem->qty) {
-                Toastr::error('"' . $cartItem->name . '" এর নির্বাচিত সাইজ/কালারটি স্টকে নেই। অন্য অপশন বেছে নিন।', 'স্টক আউট!');
+                $left = max(0, (int) $variant->stock);
+
+                $message = $left > 0
+                    ? '"' . $cartItem->name . '" এর নির্বাচিত সাইজ/কালারের মাত্র ' . $left . ' টি বাকি আছে। পরিমাণ কমিয়ে নিন।'
+                    : '"' . $cartItem->name . '" এর নির্বাচিত সাইজ/কালারটি স্টকে নেই। অন্য অপশন বেছে নিন।';
+
+                Toastr::error($message, 'স্টক আউট!');
                 return redirect()->back()
-                    ->withErrors(['variant' => '"' . $cartItem->name . '" এর নির্বাচিত সাইজ/কালারটি স্টকে নেই।'])
+                    ->withErrors(['variant' => $message])
+                    ->withInput();
+            }
+        }
+
+        // ⭐ ভ্যারিয়েন্টবিহীন সাধারণ প্রোডাক্টের স্টকও যাচাই করি — আগে শুধু
+        // ভ্যারিয়েন্ট দেখা হতো, ফলে স্টক শূন্য থাকা সাধারণ প্রোডাক্টও অর্ডার হয়ে যেত।
+        foreach (Cart::instance('shopping')->content() as $cartItem) {
+            if (ProductVariantPrice::where('product_id', $cartItem->id)->exists()) {
+                continue; // উপরে যাচাই হয়ে গেছে
+            }
+
+            $product = Product::find($cartItem->id);
+
+            if (!$product || !\Illuminate\Support\Facades\Schema::hasColumn('products', 'stock')) {
+                continue;
+            }
+
+            // ডিজিটাল প্রোডাক্টের স্টক গোনার দরকার নেই
+            if ((int) ($product->is_digital ?? 0) === 1) {
+                continue;
+            }
+
+            if ((int) $product->stock < (int) $cartItem->qty) {
+                $left = max(0, (int) $product->stock);
+
+                $message = $left > 0
+                    ? '"' . $cartItem->name . '" এর মাত্র ' . $left . ' টি স্টকে আছে। পরিমাণ কমিয়ে নিন।'
+                    : '"' . $cartItem->name . '" এখন স্টকে নেই।';
+
+                Toastr::error($message, 'স্টক আউট!');
+                return redirect()->back()
+                    ->withErrors(['stock' => $message])
                     ->withInput();
             }
         }
@@ -898,6 +932,21 @@ public function order_save(Request $request)
 
         // Amount ক্যালকুলেশন
         $subtotal = (float) str_replace([',','.00'],'',Cart::instance('shopping')->subtotal());
+
+        // ⭐ কুপনের ব্যবহারের সীমা শেষ মুহূর্তে আরেকবার যাচাই।
+        // কার্টে কুপন বসানোর পর অন্য কেউ শেষ ব্যবহারটি নিয়ে নিতে পারে,
+        // তাই অর্ডার সেভ করার ঠিক আগে ফোন নম্বর সহ আবার চেক করি।
+        $couponCode = Session::get('coupon_code');
+
+        if ($couponCode) {
+            $recheck = app(\App\Services\CouponService::class)->apply($couponCode, $request->phone);
+
+            if (!$recheck['ok']) {
+                Toastr::error($recheck['message'], 'কুপন বাতিল');
+                return redirect()->back()->withInput();
+            }
+        }
+
         $discount = Session::get('discount', 0);
         
         // ⭐ Free Delivery Check - যদি সব প্রোডাক্ট free delivery eligible হয়, shipping charge 0
@@ -960,7 +1009,15 @@ public function order_save(Request $request)
         $order->coupon_code     = Session::get('coupon_code') ?? null;
         $order->discount        = $discount ?? 0;
         $order->ip_address      = $request->ip();
-        
+
+        // ⭐ কোন ক্যাম্পেইন থেকে অর্ডারটি এলো — কনভার্শন রেট হিসাব করতে দরকার।
+        // কলামটি না থাকলে (মাইগ্রেশন চালানোর আগে) চুপচাপ এড়িয়ে যাই।
+        $campaignId = Session::get('active_campaign_id');
+
+        if ($campaignId && \Illuminate\Support\Facades\Schema::hasColumn('orders', 'campaign_id')) {
+            $order->campaign_id = $campaignId;
+        }
+
         $order->save();
 
         // Shipping info
@@ -1003,8 +1060,9 @@ public function order_save(Request $request)
         OrderHelper::saveOrderDetails($order);
 
         // Stock reduce
+        // name/status-ও লোড করি — স্টক অ্যালার্ট ও অটো আউট-অফ-স্টকের জন্য দরকার
         $details = OrderDetails::where('order_id', $order->id)
-            ->with('product:id,stock')
+            ->with('product:id,name,stock,status')
             ->get();
 
         foreach ($details as $row) {
@@ -1021,6 +1079,15 @@ public function order_save(Request $request)
                 $row->product->stock = max(0, $row->product->stock - $row->qty);
                 $row->product->save();
             }
+        }
+
+        // ⭐ স্টক অ্যালার্ট — স্টক কমানোর পরেই দেখি কোনটা ফুরিয়ে গেল কিনা।
+        // ফুরিয়ে গেলে অ্যাডমিনের জন্য অ্যালার্ট তৈরি হয় এবং সব ভ্যারিয়েন্ট
+        // শেষ হলে প্রোডাক্টটি স্বয়ংক্রিয়ভাবে নিষ্ক্রিয় হয়ে যায়।
+        try {
+            app(\App\Services\StockAlertService::class)->checkOrderItems($details);
+        } catch (\Throwable $e) {
+            Log::warning('Stock alert check failed for order ' . $order->id . ': ' . $e->getMessage());
         }
 
  // === Customer SMS ===
@@ -1121,6 +1188,29 @@ public function order_save(Request $request)
         // (সেভ করার সময় নম্বর normalize হয়, তাই দুই ফরম্যাটেই ডিলিট করা হচ্ছে)
         $normalizedPhone = preg_replace('/[^0-9+]/', '', (string) $request->phone);
         IncompleteOrder::whereIn('phone', array_unique(array_filter([$request->phone, $normalizedPhone])))->delete();
+
+        // ⭐ ক্যাম্পেইন অ্যানালিটিক্স — অর্ডার ও বিক্রির টাকা গোনা হয়।
+        if ($campaignId) {
+            app(\App\Services\CampaignAnalyticsService::class)
+                ->recordOrder($campaignId, (float) $grandTotal);
+
+            // অর্ডার হয়ে গেছে, তাই ফানেলের এই ধাপ শেষ — সেশন পরিষ্কার করি
+            // যাতে পরের সাধারণ অর্ডার ভুল করে এই ক্যাম্পেইনে গোনা না হয়।
+            Session::forget('active_campaign_id');
+        }
+
+        // ⭐ কুপন ব্যবহারের হিসাব — অর্ডার তৈরি হওয়ার পরেই গোনা হয়,
+        // কার্টে কুপন বসানোর সময় নয়। নাহলে কেউ কুপন বসিয়ে অর্ডার না করলেও
+        // সীমা কমে যেত।
+        if ($order->coupon_code) {
+            app(\App\Services\CouponService::class)->recordUsage(
+                $order->coupon_code,
+                $request->phone,
+                $order->id,
+                $customer_id,
+                (float) ($order->discount ?? 0)
+            );
+        }
 
         // ⭐ অটো ফ্রড চেক — আগে শুধু অ্যাডমিন ম্যানুয়ালি বাটনে ক্লিক করলে চলত।
         // response পাঠানোর পরে (non-blocking) চলবে, তাই কাস্টমারকে অপেক্ষা করতে হয় না।

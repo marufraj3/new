@@ -1275,6 +1275,14 @@ $brands = Brand::where('status', 1)
             }
         })->afterResponse();
 
+        // ⭐ ক্যাম্পেইন অ্যানালিটিক্স — এই পেজের ভিজিট গোনা হচ্ছে।
+        // পরে অর্ডারের সাথে মিলিয়ে কনভার্শন রেট বের করা হবে।
+        app(\App\Services\CampaignAnalyticsService::class)->recordVisit($campaign_data->id);
+
+        // কোন ক্যাম্পেইন থেকে চেকআউটে এলো সেটা সেশনে রেখে দিই — অর্ডার সেভের
+        // সময় orders.campaign_id-তে বসবে, তাই ভিজিট → অর্ডার মেলানো যাবে।
+        Session::put('active_campaign_id', $campaign_data->id);
+
         // ⭐ অর্ডার বাম্প — চেকআউটে দেখানোর মতো অ্যাড-অন অফার (AOV বাড়ানোর জন্য)
         $orderBumps = app(\App\Services\OrderBumpService::class)
             ->availableFor($campaign_data->id);

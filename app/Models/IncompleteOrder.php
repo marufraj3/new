@@ -27,6 +27,19 @@ class IncompleteOrder extends Model
         'product_image',
         'product_link',
         'total_amount',
+        // ⭐ রিকভারি ট্র্যাকিং
+        'recovery_status',
+        'recovery_note',
+        'contacted_at',
+        'recovered_order_id',
+    ];
+
+    /** রিকভারি স্ট্যাটাসের বাংলা লেবেল ও ব্যাজের রঙ */
+    public const RECOVERY_STATUSES = [
+        'pending'   => ['label' => 'নতুন',            'class' => 'secondary'],
+        'contacted' => ['label' => 'যোগাযোগ করা হয়েছে', 'class' => 'warning'],
+        'recovered' => ['label' => 'রিকভার হয়েছে',     'class' => 'success'],
+        'lost'      => ['label' => 'হারানো',           'class' => 'danger'],
     ];
 
     /**
@@ -38,7 +51,24 @@ class IncompleteOrder extends Model
         return [
             'items' => 'array',
             'total_amount' => 'float',
+            'contacted_at' => 'datetime',
         ];
+    }
+
+    /** স্ট্যাটাসের বাংলা লেবেল */
+    public function getStatusLabelAttribute(): string
+    {
+        $key = $this->recovery_status ?: 'pending';
+
+        return self::RECOVERY_STATUSES[$key]['label'] ?? $key;
+    }
+
+    /** স্ট্যাটাস ব্যাজের bootstrap ক্লাস */
+    public function getStatusClassAttribute(): string
+    {
+        $key = $this->recovery_status ?: 'pending';
+
+        return self::RECOVERY_STATUSES[$key]['class'] ?? 'secondary';
     }
 
     /**

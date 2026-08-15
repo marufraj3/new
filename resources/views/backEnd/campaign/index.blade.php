@@ -97,7 +97,10 @@
                             <tr>
                                 <th style="width: 50px;">SL</th>
                                 <th>Landing Page Title</th>
-                                <th class="text-end" style="width: 150px;">Action</th>
+                                <th style="width: 110px;">ভিজিট</th>
+                                <th style="width: 110px;">অর্ডার</th>
+                                <th style="width: 120px;">কনভার্শন</th>
+                                <th class="text-end" style="width: 180px;">Action</th>
                             </tr>
                         </thead>                
                         <tbody>
@@ -117,8 +120,34 @@
                                     </div>
                                 </td>
 
+                                {{-- ⭐ গত ৩০ দিনের পারফরম্যান্স --}}
+                                @php $st = $stats[$value->id] ?? null; @endphp
+
+                                <td>
+                                    <span class="fw-bold">{{ $st ? number_format($st['unique_visits'] ?: $st['visits']) : 0 }}</span>
+                                    <div class="text-muted" style="font-size:11px;">৩০ দিনে</div>
+                                </td>
+                                <td>
+                                    <span class="fw-bold text-success">{{ $st ? number_format($st['orders']) : 0 }}</span>
+                                    @if($st && $st['revenue'] > 0)
+                                        <div class="text-muted" style="font-size:11px;">৳{{ number_format($st['revenue'], 0) }}</div>
+                                    @endif
+                                </td>
+                                <td>
+                                    @php $cr = $st['conversion_rate'] ?? 0; @endphp
+                                    <span class="badge bg-{{ $cr >= 3 ? 'success' : ($cr > 0 ? 'warning' : 'secondary') }}">
+                                        {{ $cr }}%
+                                    </span>
+                                </td>
+
                                 <td class="text-end">
                                     <div class="d-inline-flex gap-2">
+
+                                        {{-- ⭐ অ্যানালিটিক্স --}}
+                                        <a href="{{ route('campaign.analytics', $value->id) }}" class="action-btn btn-view" title="Analytics">
+                                            <i class="fe-bar-chart-2"></i>
+                                        </a>
+
                                         
                                         {{-- View Live --}}
                                         <a href="{{url('campaign',$value->slug)}}" target="_blank" class="action-btn btn-view" title="View Live">

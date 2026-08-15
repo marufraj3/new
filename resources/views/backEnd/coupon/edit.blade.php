@@ -115,6 +115,44 @@
                             </div>
                         </div>
 
+
+                        {{-- ⭐ ব্যবহারের সীমা — ঘর ফাঁকা রাখলে অসীমবার ব্যবহার করা যাবে --}}
+                        <div class="p-3 bg-light rounded-3 mb-4 border">
+                            <h6 class="text-dark fw-bold mb-3 small text-uppercase">
+                                <i data-feather="shield" style="width:14px;" class="me-1"></i> ব্যবহারের সীমা (Usage Limits)
+                            </h6>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label-custom mb-1">মোট কতবার ব্যবহার করা যাবে</label>
+                                    <input type="number" min="1" name="usage_limit" class="form-control form-control-custom"
+                                           placeholder="সীমাহীন" value="{{ old('usage_limit', $coupon->usage_limit) }}">
+                                    <small class="text-muted">সব কাস্টমার মিলিয়ে। ফাঁকা রাখলে সীমা থাকবে না।</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label-custom mb-1">প্রতি কাস্টমার কতবার</label>
+                                    <input type="number" min="1" name="usage_limit_per_customer" class="form-control form-control-custom"
+                                           placeholder="সীমাহীন" value="{{ old('usage_limit_per_customer', $coupon->usage_limit_per_customer) }}">
+                                    <small class="text-muted">একই ফোন নম্বর থেকে সর্বোচ্চ কতবার।</small>
+                                </div>
+                            </div>
+
+                            @if((int) ($coupon->used_count ?? 0) > 0)
+                                <div class="d-flex align-items-center justify-content-between mt-3 pt-3 border-top">
+                                    <span class="small text-muted">
+                                        এ পর্যন্ত ব্যবহার হয়েছে: <strong class="text-dark">{{ (int) $coupon->used_count }}</strong> বার
+                                        @if($coupon->usage_limit)
+                                            / {{ (int) $coupon->usage_limit }}
+                                        @endif
+                                    </span>
+                                    <a href="{{ route('admin.coupons.reset_usage', $coupon->id) }}"
+                                       class="btn btn-sm btn-outline-danger rounded-pill px-3"
+                                       onclick="return confirm('এই কুপনের ব্যবহারের হিসাব রিসেট করবেন? সীমা আবার শূন্য থেকে শুরু হবে।')">
+                                        হিসাব রিসেট
+                                    </a>
+                                </div>
+                            @endif
+                        </div>
+
                         {{-- Validity Dates --}}
                         <div class="p-3 bg-light rounded-3 mb-4 border">
                             <h6 class="text-dark fw-bold mb-3 small text-uppercase"><i data-feather="calendar" style="width:14px;" class="me-1"></i> Validity Period</h6>

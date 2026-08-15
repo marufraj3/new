@@ -832,7 +832,15 @@
                         return;
                     }
 
-                    result = await postConversionAction(wrapper.dataset.applyUrl, { coupon_code: code });
+                    /* কুপনের প্রতি-কাস্টমার সীমা ফোন নম্বর দিয়ে গোনা হয়, তাই
+                       চেকআউট ফর্মে নম্বর লেখা থাকলে সেটিও পাঠাই। */
+                    const phoneField = document.querySelector('#cpb-phone, [name="phone"]');
+                    const phone = (phoneField?.value || '').trim();
+
+                    const payload = { coupon_code: code };
+                    if (phone) payload.phone = phone;
+
+                    result = await postConversionAction(wrapper.dataset.applyUrl, payload);
 
                     if (result.ok) {
                         /* সফল হলে ইনপুটের জায়গায় "প্রয়োগ হয়েছে" ব্যাজ বসাই */

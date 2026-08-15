@@ -114,6 +114,13 @@
     <meta property="og:url" content="{{ route('campaign', $campaign_data->slug) }}">
     @if($campaignImage)<meta property="og:image" content="{{ asset($campaignImage) }}">@endif
     <link rel="shortcut icon" href="{{ asset(optional($generalsetting)->favicon) }}" type="image/x-icon">
+
+    {{-- ⭐ স্ট্রাকচার্ড ডেটা (JSON-LD) — সার্চ রেজাল্টে দাম, স্টক ও রেটিং দেখানোর জন্য --}}
+    {!! app(\App\Services\ProductSchemaService::class)->campaignScript(
+            $campaign_data,
+            $products,
+            route('campaign', $campaign_data->slug)
+       ) !!}
     {{-- bootstrap.min.css (216K), FontAwesome all.css (140K) ও jQuery (88K) সরানো হয়েছে —
          এই পেজের সব স্টাইল campaign-page-renderer.css + builder-এর page_css থেকে আসে
          এবং renderer JS সম্পূর্ণ vanilla। FB ads ট্রাফিকের জন্য ~৩৫০KB সাশ্রয়। --}}

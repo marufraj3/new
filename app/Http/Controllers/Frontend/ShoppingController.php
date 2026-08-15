@@ -149,9 +149,22 @@ class ShoppingController extends Controller
     // 🟢 Apply coupon
     public function applyCoupon(Request $request)
     {
-        $request->validate(['coupon_code' => 'required']);
+        $request->validate([
+            'coupon_code' => 'required',
+            'phone'       => 'nullable|string|max:30',
+        ]);
 
-        $result = app(\App\Services\CouponService::class)->apply($request->coupon_code);
+        // ⭐ কুপনের "প্রতি কাস্টমার সর্বোচ্চ কতবার" সীমা ফোন নম্বর দিয়ে গোনা হয়।
+        // চেকআউট ফর্মে ফোন লেখা থাকলে সেটি পাঠানো হয়; না থাকলে লগইন করা
+        // কাস্টমারের নম্বর ব্যবহার করি। কোনোটিই না থাকলে শুধু মোট সীমা প্রযোজ্য
+        // হবে — অর্ডার সেভের সময় আসল ফোন দিয়ে আবার যাচাই করা হয়।
+        $phone = $request->input('phone');
+
+        if (!$phone && auth()->guard('web')->check()) {
+            $phone = auth()->guard('web')->user()->phone ?? null;
+        }
+
+        $result = app(\App\Services\CouponService::class)->apply($request->coupon_code, $phone);
 
         // ক্যাম্পেইন/বিল্ডার পেজ কোনো রিলোড করে না — সেখান থেকে আসা রিকোয়েস্টে
         // JSON + রিফ্রেশ করা কার্ট HTML দুটোই ফেরত দিই, যাতে এক রাউন্ডট্রিপেই
@@ -328,6 +341,11 @@ class ShoppingController extends Controller
         ]);
 
         Toastr::success('Product added to cart successfully!', 'Success');
+
+        // ⭐ ক্যাম্পেইন পেজ থেকে কার্টে যোগ হলে সেটা গোনা হয় (funnel: ভিজিট → কার্ট → অর্ডার)
+        if ($campaignId = Session::get('active_campaign_id')) {
+            app(\App\Services\CampaignAnalyticsService::class)->recordAddToCart($campaignId);
+        }
 
         // যদি ফর্ম থেকে "order_now" ক্লিক করা হয়ে থাকে, সরাসরি checkout
         if ($request->has('order_now')) {

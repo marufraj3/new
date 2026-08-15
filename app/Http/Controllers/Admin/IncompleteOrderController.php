@@ -23,10 +23,85 @@ class IncompleteOrderController extends Controller
     /**
      * ইনকমপ্লিট অর্ডার লিস্ট
      */
-    public function index()
+    public function index(Request $request)
     {
-        $orders = IncompleteOrder::latest()->paginate(25);
-        return view('backEnd.incomplete_orders.index', compact('orders'));
+        $status = $request->query('status');
+        $search = trim((string) $request->query('q'));
+
+        $query = IncompleteOrder::query();
+
+        // recovery_status কলামটি মাইগ্রেশনের আগে না-ও থাকতে পারে —
+        // পুরনো ইনস্টলে পেজটা যেন সাদা না হয়ে যায়।
+        $hasRecovery = Schema::hasColumn('incomplete_orders', 'recovery_status');
+
+        if ($hasRecovery) {
+            if ($status && array_key_exists($status, IncompleteOrder::RECOVERY_STATUSES)) {
+                $query->where('recovery_status', $status);
+            } elseif ($status !== 'all') {
+                // ডিফল্টে শুধু কাজের সারি — যেগুলোর ফলোআপ এখনো বাকি।
+                // রিকভার/হারানো রো গুলো "সব" ফিল্টারে দেখা যাবে।
+                $query->whereIn('recovery_status', ['pending', 'contacted']);
+            }
+        }
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', '%' . $search . '%')
+                  ->orWhere('phone', 'like', '%' . $search . '%');
+            });
+        }
+
+        $orders = $query->latest()->paginate(25)->withQueryString();
+
+        // উপরের সামারি কার্ডগুলো — ফিল্টার নির্বিশেষে সবসময় মোট হিসাব দেখায়
+        $stats = [
+            'total'      => IncompleteOrder::count(),
+            'amount'     => (float) IncompleteOrder::sum('total_amount'),
+            'today'      => IncompleteOrder::whereDate('created_at', now()->toDateString())->count(),
+            'pending'    => $hasRecovery ? IncompleteOrder::where('recovery_status', 'pending')->count() : 0,
+            'contacted'  => $hasRecovery ? IncompleteOrder::where('recovery_status', 'contacted')->count() : 0,
+            'recovered'  => $hasRecovery ? IncompleteOrder::where('recovery_status', 'recovered')->count() : 0,
+            'lost'       => $hasRecovery ? IncompleteOrder::where('recovery_status', 'lost')->count() : 0,
+        ];
+
+        // রিকভারি রেট = রিকভার হওয়া / (মোট নিষ্পত্তি হওয়া), শূন্য দিয়ে ভাগ এড়িয়ে
+        $settled = $stats['recovered'] + $stats['lost'];
+        $stats['recovery_rate'] = $settled > 0
+            ? round(($stats['recovered'] / $settled) * 100, 1)
+            : 0.0;
+
+        return view('backEnd.incomplete_orders.index', compact('orders', 'stats', 'status', 'search', 'hasRecovery'));
+    }
+
+    /**
+     * রিকভারি স্ট্যাটাস / নোট আপডেট।
+     *
+     * এখানে কোনো SMS বা WhatsApp পাঠানো হয় না — অ্যাডমিন নিজে ফোন করে
+     * তারপর এখানে ফলাফল টুকে রাখেন।
+     */
+    public function updateRecovery(Request $request, $id)
+    {
+        $request->validate([
+            'recovery_status' => 'required|in:' . implode(',', array_keys(IncompleteOrder::RECOVERY_STATUSES)),
+            'recovery_note'   => 'nullable|string|max:1000',
+        ]);
+
+        $incomplete = IncompleteOrder::findOrFail($id);
+
+        $incomplete->recovery_status = $request->recovery_status;
+        $incomplete->recovery_note   = $request->recovery_note;
+
+        // প্রথমবার 'contacted' করার সময়টা ধরে রাখি, পরে বদলাই না —
+        // এতে "কতদিন ধরে ফলোআপ চলছে" বোঝা যায়।
+        if ($request->recovery_status === 'contacted' && !$incomplete->contacted_at) {
+            $incomplete->contacted_at = now();
+        }
+
+        $incomplete->save();
+
+        Toastr::success('রিকভারি স্ট্যাটাস আপডেট হয়েছে।', 'Success');
+
+        return redirect()->back();
     }
 
     /**
@@ -180,8 +255,21 @@ class IncompleteOrderController extends Controller
                 }
             }
 
-            // ইনকমপ্লিট অর্ডার ডিলিট
-            $incomplete->delete();
+            // ⭐ ডিলিট না করে 'recovered' চিহ্নিত করি — তাহলে রিকভারি
+            // রিপোর্টে হিসাবটা থেকে যায়। কলামটি না থাকলে (পুরনো ইনস্টল)
+            // আগের মতোই ডিলিট হবে।
+            if (Schema::hasColumn('incomplete_orders', 'recovery_status')) {
+                $incomplete->recovery_status    = 'recovered';
+                $incomplete->recovered_order_id = $order->id;
+
+                if (!$incomplete->contacted_at) {
+                    $incomplete->contacted_at = now();
+                }
+
+                $incomplete->save();
+            } else {
+                $incomplete->delete();
+            }
 
             DB::commit();
 

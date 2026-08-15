@@ -21,7 +21,33 @@ class CampaignController extends Controller
     public function index(Request $request)
     {
         $show_data = Campaign::orderBy('id','DESC')->get();
-        return view('backEnd.campaign.index',compact('show_data'));
+
+        // ⭐ প্রতিটি ক্যাম্পেইনের পারফরম্যান্স — এক কুয়েরিতে সব, N+1 এড়াতে
+        $stats = app(\App\Services\CampaignAnalyticsService::class)->summaryForAll(30);
+
+        return view('backEnd.campaign.index',compact('show_data','stats'));
+    }
+
+    /**
+     * ⭐ এক ক্যাম্পেইনের বিস্তারিত অ্যানালিটিক্স — ভিজিট, কার্ট, অর্ডার,
+     * কনভার্শন রেট ও দৈনিক ভাঙানো হিসাব।
+     */
+    public function analytics(Request $request, $id)
+    {
+        $campaign = Campaign::findOrFail($id);
+        $days     = (int) $request->query('days', 30);
+
+        // অস্বাভাবিক রেঞ্জ দিলে ডিফল্টে ফিরে যাই — নাহলে বিশাল কুয়েরি হতে পারে
+        if (!in_array($days, [7, 30, 90, 365], true)) {
+            $days = 30;
+        }
+
+        $service = app(\App\Services\CampaignAnalyticsService::class);
+
+        $summary = $service->summary($campaign->id, $days);
+        $daily   = $service->daily($campaign->id, $days);
+
+        return view('backEnd.campaign.analytics', compact('campaign', 'summary', 'daily', 'days'));
     }
     public function create()
     {

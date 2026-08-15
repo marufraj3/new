@@ -158,6 +158,13 @@
         <meta property="og:description" content="{{ $campaign_data->description}}" />
         <meta property="og:site_name" content="{{$campaign_data->name}}" />
 
+        {{-- ⭐ স্ট্রাকচার্ড ডেটা (JSON-LD) — সার্চ রেজাল্টে দাম, স্টক ও রেটিং দেখানোর জন্য --}}
+        {!! app(\App\Services\ProductSchemaService::class)->campaignScript(
+                $campaign_data,
+                $products,
+                route('campaign', $campaign_data->slug)
+           ) !!}
+
         <!-- ========== Facebook Pixel (single init) ========== -->
         @if($pixels->count() > 0)
         <script>

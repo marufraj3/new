@@ -3,8 +3,12 @@
 namespace App\Services;
 
 use App\Models\Coupon;
+use App\Models\CouponUsage;
 use Carbon\Carbon;
 use Cart;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Session;
 
 /**
@@ -23,7 +27,7 @@ class CouponService
      *
      * @return array{ok: bool, message: string, discount: float, code: ?string}
      */
-    public function apply(?string $code): array
+    public function apply(?string $code, ?string $phone = null): array
     {
         $code = trim((string) $code);
 
@@ -50,6 +54,10 @@ class CouponService
             return $this->fail(
                 'এই কুপন ব্যবহারে কমপক্ষে ৳' . number_format((float) $coupon->min_purchase, 0) . ' এর কেনাকাটা প্রয়োজন।'
             );
+        }
+
+        if ($limitMessage = $this->limitViolation($coupon, $phone)) {
+            return $this->fail($limitMessage);
         }
 
         $discount = $this->discountFor($coupon, $subtotal);
@@ -123,6 +131,109 @@ class CouponService
         }
 
         Session::put('discount', $this->discountFor($coupon, $subtotal));
+    }
+
+    /**
+     * ব্যবহারের সীমা অতিক্রম হয়েছে কিনা — হলে বাংলা মেসেজ, নাহলে null।
+     *
+     * দুই ধরনের সীমা:
+     *  - usage_limit: কুপনটি সব মিলিয়ে কতবার ব্যবহার করা যাবে
+     *  - usage_limit_per_customer: একই ফোন নম্বর কতবার ব্যবহার করতে পারবে
+     *
+     * null বা 0 মানে সীমা নেই (পুরনো কুপনগুলোর আচরণ অপরিবর্তিত থাকে)।
+     */
+    protected function limitViolation(Coupon $coupon, ?string $phone): ?string
+    {
+        try {
+            $totalLimit = (int) ($coupon->usage_limit ?? 0);
+
+            if ($totalLimit > 0 && (int) ($coupon->used_count ?? 0) >= $totalLimit) {
+                return 'এই কুপনটির ব্যবহারের সীমা শেষ হয়ে গেছে।';
+            }
+
+            $perCustomer = (int) ($coupon->usage_limit_per_customer ?? 0);
+            $phone       = $this->normalizePhone($phone);
+
+            if ($perCustomer > 0 && $phone !== null && Schema::hasTable('coupon_usages')) {
+                $used = CouponUsage::where('coupon_id', $coupon->id)
+                    ->where('phone', $phone)
+                    ->count();
+
+                if ($used >= $perCustomer) {
+                    return 'আপনি এই কুপনটি ইতিমধ্যে ব্যবহার করেছেন।';
+                }
+            }
+
+            return null;
+        } catch (\Throwable $e) {
+            // সীমা যাচাই ব্যর্থ হলে কুপন আটকাবো না — বিক্রি হারানোর চেয়ে
+            // একটা বাড়তি ছাড় দেওয়াই ভালো। কিন্তু লগে রেখে দিই।
+            Log::warning('Coupon limit check failed: ' . $e->getMessage());
+
+            return null;
+        }
+    }
+
+    /**
+     * অর্ডার সম্পন্ন হলে কুপনের ব্যবহার গোনা হয়।
+     *
+     * গুরুত্বপূর্ণ: গণনা এখানে হয়, apply()-তে নয়। কেউ কুপন বসিয়ে অর্ডার
+     * না করলে সেটা "ব্যবহার" নয় — নাহলে কার্টে কুপন বসিয়ে রেখে দিলেই
+     * সীমা ফুরিয়ে যেত।
+     */
+    public function recordUsage(?string $code, ?string $phone, $orderId = null, $customerId = null, float $discount = 0): void
+    {
+        try {
+            $code = trim((string) $code);
+
+            if ($code === '') {
+                return;
+            }
+
+            $coupon = Coupon::where('code', $code)->first();
+
+            if (!$coupon) {
+                return;
+            }
+
+            // race condition এড়াতে atomic increment
+            DB::table('coupons')->where('id', $coupon->id)->increment('used_count');
+
+            if (Schema::hasTable('coupon_usages')) {
+                CouponUsage::create([
+                    'coupon_id'   => $coupon->id,
+                    'code'        => $coupon->code,
+                    'phone'       => $this->normalizePhone($phone),
+                    'order_id'    => $orderId,
+                    'customer_id' => $customerId,
+                    'discount'    => $discount,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            // অর্ডার হয়ে গেছে — শুধু হিসাব রাখতে ব্যর্থ হয়েছি বলে
+            // কাস্টমারকে এরর দেখানোর কোনো মানে নেই।
+            Log::warning('Coupon usage recording failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * ফোন নম্বর একরকম করে রাখি, নাহলে "01712-345678" আর "8801712345678"
+     * আলাদা কাস্টমার হিসেবে গোনা হবে এবং প্রতি-কাস্টমার সীমা ফাঁকি দেওয়া যাবে।
+     */
+    protected function normalizePhone(?string $phone): ?string
+    {
+        $digits = preg_replace('/\D/', '', (string) $phone);
+
+        if ($digits === '') {
+            return null;
+        }
+
+        // 8801712345678 / 8801712345678 → 01712345678
+        if (strlen($digits) > 11 && str_starts_with($digits, '880')) {
+            $digits = '0' . substr($digits, 3);
+        }
+
+        return $digits;
     }
 
     /**

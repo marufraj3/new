@@ -113,6 +113,29 @@
                             <small class="text-muted ms-1">Minimum cart value required to apply this coupon.</small>
                         </div>
 
+
+                        {{-- ⭐ ব্যবহারের সীমা — ঘর ফাঁকা রাখলে অসীমবার ব্যবহার করা যাবে --}}
+                        <div class="p-3 bg-light rounded-3 mb-4 border">
+                            <h6 class="text-dark fw-bold mb-3 small text-uppercase">
+                                <i data-feather="shield" style="width:14px;" class="me-1"></i> ব্যবহারের সীমা (Usage Limits)
+                            </h6>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label-custom mb-1">মোট কতবার ব্যবহার করা যাবে</label>
+                                    <input type="number" min="1" name="usage_limit" class="form-control form-control-custom"
+                                           placeholder="সীমাহীন" value="{{ old('usage_limit') }}">
+                                    <small class="text-muted">সব কাস্টমার মিলিয়ে। ফাঁকা রাখলে সীমা থাকবে না।</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label-custom mb-1">প্রতি কাস্টমার কতবার</label>
+                                    <input type="number" min="1" name="usage_limit_per_customer" class="form-control form-control-custom"
+                                           placeholder="সীমাহীন" value="{{ old('usage_limit_per_customer') }}">
+                                    <small class="text-muted">একই ফোন নম্বর থেকে সর্বোচ্চ কতবার।</small>
+                                </div>
+                            </div>
+                            
+                        </div>
+
                         {{-- Validity Dates --}}
                         <div class="p-3 bg-light rounded-3 mb-4 border">
                             <h6 class="text-dark fw-bold mb-3 small text-uppercase"><i data-feather="calendar" style="width:14px;" class="me-1"></i> Validity Period</h6>

@@ -29,6 +29,14 @@
 <meta property="og:image" content="{{ $metaImage }}" />
 <meta property="og:description" content="{{ $metaDescription }}" />
 <meta property="og:site_name" content="gomobd.com" />
+
+{{-- ⭐ স্ট্রাকচার্ড ডেটা (JSON-LD) — Google সার্চ রেজাল্টে দাম, স্টক অবস্থা ও
+     তারকা রেটিং দেখানোর জন্য। রিভিউ না থাকলে রেটিং অংশটি বাদ যায়। --}}
+{!! app(\App\Services\ProductSchemaService::class)->productScript(
+        $details,
+        $reviews ?? null,
+        route('product', $details->slug)
+   ) !!}
 @endpush
 
 
