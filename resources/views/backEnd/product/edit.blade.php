@@ -286,13 +286,13 @@
                                         </div>
 
                                         <div class="col-md-2 mb-2">
-                                            <label class="form-label">Price</label>
+                                            <label class="form-label">Default Price</label>
                                             <input type="number" step="0.01" name="variant_price[{{ $variantIndex }}][price]"
                                                    value="{{ $firstVariant->price }}" class="form-control" placeholder="Enter Price">
                                         </div>
 
                                         <div class="col-md-2 mb-2">
-                                            <label class="form-label">Stock</label>
+                                            <label class="form-label">Default Stock</label>
                                             <input type="number" name="variant_price[{{ $variantIndex }}][stock]"
                                                    value="{{ $firstVariant->stock }}" class="form-control" placeholder="0">
                                         </div>
@@ -336,6 +336,27 @@
                                                     <i class="fa fa-trash"></i>
                                                 </button>
                                             @endif
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-12">
+                                            <div class="variant-size-stocks mt-1" @if(empty($sizeIds)) style="display:none;" @endif>
+                                                <label class="form-label fw-bold mb-1"><i class="fe-box me-1"></i> Size-wise Stock &amp; Price</label>
+                                                <div class="size-stock-rows row g-2">
+                                                    @foreach($variantsForColor as $sv)
+                                                        @if($sv->size_id)
+                                                        <div class="col-md-3 col-6 size-stock-item" data-size-id="{{ $sv->size_id }}">
+                                                            <div class="border rounded p-2 bg-white">
+                                                                <div class="fw-bold mb-1" style="font-size:12px;">Size: {{ optional($sv->size)->sizeName ?? 'N/A' }}</div>
+                                                                <input type="number" min="0" class="form-control form-control-sm size-stock-input mb-1" placeholder="Stock" value="{{ $sv->stock }}">
+                                                                <input type="number" step="0.01" min="0" class="form-control form-control-sm size-price-input" placeholder="Price (optional)" value="{{ $sv->price }}">
+                                                            </div>
+                                                        </div>
+                                                        @endif
+                                                    @endforeach
+                                                </div>
+                                                <small class="text-muted d-block mt-1"><i class="fa fa-info-circle"></i> প্রতিটি সাইজের আলাদা স্টক ও দাম দিন। খালি রাখলে Default Price/Stock ব্যবহার হবে।</small>
+                                            </div>
                                         </div>
                                     </div>
                                     <div class="row">
@@ -396,6 +417,15 @@
                                             <button type="button" class="btn btn-success add-variant" style="margin-top:5px;">
                                                 <i class="fa fa-plus"></i>
                                             </button>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-12">
+                                            <div class="variant-size-stocks mt-1" style="display:none;">
+                                                <label class="form-label fw-bold mb-1"><i class="fe-box me-1"></i> Size-wise Stock &amp; Price</label>
+                                                <div class="size-stock-rows row g-2"></div>
+                                                <small class="text-muted d-block mt-1"><i class="fa fa-info-circle"></i> প্রতিটি সাইজের আলাদা স্টক ও দাম দিন। খালি রাখলে Default Price/Stock ব্যবহার হবে।</small>
+                                            </div>
                                         </div>
                                     </div>
                                     <div class="row">
@@ -905,6 +935,7 @@ document.addEventListener('DOMContentLoaded', function () {
             newRow.find('.select2-container').remove();
 
             newRow.find('.variant-existing-imgs').remove();
+            newRow.find('.variant-size-stocks').hide().find('.size-stock-rows').empty();
             newRow.find('input, select').each(function () {
                 const oldName = $(this).attr('name');
                 if (oldName) {
@@ -951,6 +982,45 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    // ===== Size-wise Stock & Price rows (edit) =====
+    function buildSizeStockRows($row) {
+        var $sizeSelect = $row.find('.variant-size-select');
+        var selected = $sizeSelect.val() || [];
+        var $wrap = $row.find('.variant-size-stocks');
+        var $rows = $wrap.find('.size-stock-rows');
+        if (!selected.length) { $wrap.hide(); $rows.empty(); return; }
+
+        // Keep existing values for still-selected sizes
+        var existing = {};
+        $rows.find('.size-stock-item').each(function () {
+            var sid = String($(this).data('size-id'));
+            existing[sid] = {
+                stock: $(this).find('.size-stock-input').val(),
+                price: $(this).find('.size-price-input').val()
+            };
+        });
+
+        $rows.empty();
+        selected.forEach(function (sizeId) {
+            var sizeName = $sizeSelect.find('option[value="' + sizeId + '"]').text().trim();
+            var prev = existing[String(sizeId)] || {};
+            var html =
+                '<div class="col-md-3 col-6 size-stock-item" data-size-id="' + sizeId + '">' +
+                    '<div class="border rounded p-2 bg-white">' +
+                        '<div class="fw-bold mb-1" style="font-size:12px;">Size: ' + sizeName + '</div>' +
+                        '<input type="number" min="0" class="form-control form-control-sm size-stock-input mb-1" placeholder="Stock" value="' + (prev.stock !== undefined ? prev.stock : '') + '">' +
+                        '<input type="number" step="0.01" min="0" class="form-control form-control-sm size-price-input" placeholder="Price (optional)" value="' + (prev.price !== undefined ? prev.price : '') + '">' +
+                    '</div>' +
+                '</div>';
+            $rows.append(html);
+        });
+        $wrap.show();
+    }
+
+    $(document).on('change', '.variant-size-select', function () {
+        buildSizeStockRows($(this).closest('.variant-item'));
+    });
+
     // Variant Image Preview & Clear
     $(document).on('change', '.variant-img-input', function() {
         var $input = $(this);
@@ -990,10 +1060,15 @@ document.addEventListener('DOMContentLoaded', function () {
                     return;
                 }
                 
-                // If sizes are selected, create separate entry for each size
+                // If sizes are selected, create separate entry for each size (size-wise stock & price)
                 if (selectedSizes.length > 0) {
                     selectedSizes.forEach(function(sizeId) {
-                        variantData.push({ index: variantIndex++, color_id: colorId, size_id: sizeId, price: price, stock: stock, image_row: rowIndex });
+                        let $sizeItem = $row.find('.size-stock-item[data-size-id="' + sizeId + '"]');
+                        let sizeStock = $sizeItem.find('.size-stock-input').val();
+                        let sizePrice = $sizeItem.find('.size-price-input').val();
+                        let finalStock = (sizeStock !== undefined && sizeStock !== '') ? sizeStock : stock;
+                        let finalPrice = (sizePrice !== undefined && sizePrice !== '') ? sizePrice : price;
+                        variantData.push({ index: variantIndex++, color_id: colorId, size_id: sizeId, price: finalPrice, stock: finalStock, image_row: rowIndex });
                     });
                 } else {
                     variantData.push({ index: variantIndex++, color_id: colorId, size_id: null, price: price, stock: stock, image_row: rowIndex });

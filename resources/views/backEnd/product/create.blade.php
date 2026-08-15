@@ -167,11 +167,11 @@
                                         </select>
                                     </div>
                                     <div class="col-md-2 mb-2">
-                                        <label class="form-label">Price</label>
+                                        <label class="form-label">Default Price</label>
                                         <input type="number" step="0.01" name="variant_price[0][price]" class="form-control" placeholder="0.00">
                                     </div>
                                     <div class="col-md-2 mb-2">
-                                        <label class="form-label">Stock</label>
+                                        <label class="form-label">Default Stock</label>
                                         <input type="number" name="variant_price[0][stock]" class="form-control" placeholder="0">
                                     </div>
                                     <div class="col-md-3 mb-2">
@@ -186,6 +186,15 @@
                                     </div>
                                     <div class="col-md-1 mb-2">
                                         <button type="button" class="btn btn-danger btn-remove-row d-none w-100"><i class="fe-trash-2"></i></button>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-12">
+                                        <div class="variant-size-stocks mt-1" style="display:none;">
+                                            <label class="form-label fw-bold mb-1"><i class="fe-box me-1"></i> Size-wise Stock &amp; Price</label>
+                                            <div class="size-stock-rows row g-2"></div>
+                                            <small class="text-muted d-block mt-1"><i class="fa fa-info-circle"></i> প্রতিটি সাইজের আলাদা স্টক ও দাম দিন। খালি রাখলে উপরের Default Price/Stock ব্যবহার হবে।</small>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="row">
@@ -477,6 +486,7 @@
             // Clear inputs and fix select2
             firstRow.find('.select2-container').remove();
             firstRow.find('input').val('');
+            firstRow.find('.variant-size-stocks').hide().find('.size-stock-rows').empty();
             firstRow.find('select').each(function(){
                 let oldName = $(this).attr('name');
                 if (oldName) {
@@ -519,6 +529,45 @@
             $(this).parents(".variant-item").remove();
         });
 
+        // ===== Size-wise Stock & Price rows =====
+        function buildSizeStockRows($row) {
+            var $sizeSelect = $row.find('.variant-size-select');
+            var selected = $sizeSelect.val() || [];
+            var $wrap = $row.find('.variant-size-stocks');
+            var $rows = $wrap.find('.size-stock-rows');
+            if (!selected.length) { $wrap.hide(); $rows.empty(); return; }
+
+            // Keep existing values for still-selected sizes
+            var existing = {};
+            $rows.find('.size-stock-item').each(function () {
+                var sid = $(this).data('size-id');
+                existing[sid] = {
+                    stock: $(this).find('.size-stock-input').val(),
+                    price: $(this).find('.size-price-input').val()
+                };
+            });
+
+            $rows.empty();
+            selected.forEach(function (sizeId) {
+                var sizeName = $sizeSelect.find('option[value="' + sizeId + '"]').text().trim();
+                var prev = existing[sizeId] || {};
+                var html =
+                    '<div class="col-md-3 col-6 size-stock-item" data-size-id="' + sizeId + '">' +
+                        '<div class="border rounded p-2 bg-white">' +
+                            '<div class="fw-bold mb-1" style="font-size:12px;">Size: ' + sizeName + '</div>' +
+                            '<input type="number" min="0" class="form-control form-control-sm size-stock-input mb-1" placeholder="Stock" value="' + (prev.stock || '') + '">' +
+                            '<input type="number" step="0.01" min="0" class="form-control form-control-sm size-price-input" placeholder="Price (optional)" value="' + (prev.price || '') + '">' +
+                        '</div>' +
+                    '</div>';
+                $rows.append(html);
+            });
+            $wrap.show();
+        }
+
+        $("body").on("change", ".variant-size-select", function () {
+            buildSizeStockRows($(this).closest('.variant-item'));
+        });
+
         // Variant Image Preview & Clear
         $("body").on("change", ".variant-img-input", function() {
             var $input = $(this);
@@ -555,7 +604,13 @@
                 
                 if (selectedSizes.length > 0) {
                     selectedSizes.forEach(function(sizeId) {
-                        variantData.push({ index: variantIndex++, color_id: colorId, size_id: sizeId, price: price, stock: stock, image_row: rowIndex });
+                        // Size-wise stock/price (fallback: row default)
+                        let $sizeItem = $row.find('.size-stock-item[data-size-id="' + sizeId + '"]');
+                        let sizeStock = $sizeItem.find('.size-stock-input').val();
+                        let sizePrice = $sizeItem.find('.size-price-input').val();
+                        let finalStock = (sizeStock !== undefined && sizeStock !== '') ? sizeStock : stock;
+                        let finalPrice = (sizePrice !== undefined && sizePrice !== '') ? sizePrice : price;
+                        variantData.push({ index: variantIndex++, color_id: colorId, size_id: sizeId, price: finalPrice, stock: finalStock, image_row: rowIndex });
                     });
                 } else {
                     variantData.push({ index: variantIndex++, color_id: colorId, size_id: null, price: price, stock: stock, image_row: rowIndex });

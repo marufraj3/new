@@ -830,6 +830,40 @@ public function order_save(Request $request)
             return redirect()->back();
         }
 
+        // ⭐ ভ্যারিয়েন্ট (সাইজ/কালার) ভ্যালিডেশন — অর্ডারের আগে স্টক নিশ্চিত করি
+        foreach (Cart::instance('shopping')->content() as $cartItem) {
+            $variantMatrix = ProductVariantPrice::where('product_id', $cartItem->id);
+            if (!(clone $variantMatrix)->exists()) {
+                continue;
+            }
+
+            $requiresSize  = (clone $variantMatrix)->whereNotNull('size_id')->exists();
+            $requiresColor = (clone $variantMatrix)->whereNotNull('color_id')->exists();
+            $sizeId  = $cartItem->options->size_id ?? null;
+            $colorId = $cartItem->options->color_id ?? null;
+
+            if (($requiresSize && !$sizeId) || ($requiresColor && !$colorId)) {
+                Toastr::error('অর্ডারের আগে "' . $cartItem->name . '" এর সাইজ/কালার সিলেক্ট করুন।', 'Failed!');
+                return redirect()->back()
+                    ->withErrors(['variant' => 'অর্ডারের আগে "' . $cartItem->name . '" এর সাইজ/কালার সিলেক্ট করুন।'])
+                    ->withInput();
+            }
+
+            $variant = ($cartItem->options->variant_price_id ?? null)
+                ? ProductVariantPrice::find($cartItem->options->variant_price_id)
+                : (clone $variantMatrix)
+                    ->when($sizeId, fn ($q) => $q->where('size_id', $sizeId))
+                    ->when($colorId, fn ($q) => $q->where('color_id', $colorId))
+                    ->first();
+
+            if ($variant && $variant->stock !== null && (int) $variant->stock < (int) $cartItem->qty) {
+                Toastr::error('"' . $cartItem->name . '" এর নির্বাচিত সাইজ/কালারটি স্টকে নেই। অন্য অপশন বেছে নিন।', 'স্টক আউট!');
+                return redirect()->back()
+                    ->withErrors(['variant' => '"' . $cartItem->name . '" এর নির্বাচিত সাইজ/কালারটি স্টকে নেই।'])
+                    ->withInput();
+            }
+        }
+
         // ⭐ কার্টে ডিজিটাল প্রোডাক্ট আছে কি না চেক
         $hasDigital = \App\Http\Controllers\Frontend\ShoppingController::hasDigitalProductInCart();
 

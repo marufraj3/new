@@ -26,11 +26,65 @@
             $_firstProd     = $products->first();
             $camp_value     = $_firstProd ? (float) $_firstProd->new_price : 0.0;
             $camp_products  = $products->map(function($p) {
+                // সাইজ/কালার নাম প্রথমে variantPrices থেকে (নতুন এডমিন প্যানেল সেখানে সেভ করে),
+                // পুরনো pivot টেবিল শুধু fallback — যাতে ID নাম্বার না দেখায়।
+                $sizeOptions = [];
+                $colorOptions = [];
+                foreach ($p->variantPrices ?? [] as $v) {
+                    if ($v->size_id && $v->size) {
+                        if (!isset($sizeOptions[$v->size_id])) {
+                            $sizeOptions[$v->size_id] = [
+                                'id' => (string) $v->size_id,
+                                'name' => $v->size->sizeName ?? $v->size->name ?? ('Size '.$v->size_id),
+                                'stock' => 0,
+                                'has_stock' => false,
+                            ];
+                        }
+                        if ($v->stock !== null) {
+                            $sizeOptions[$v->size_id]['stock'] += max(0, (int) $v->stock);
+                            $sizeOptions[$v->size_id]['has_stock'] = true;
+                        }
+                    }
+                    if ($v->color_id && $v->color) {
+                        $colorOptions[$v->color_id] = [
+                            'id' => (string) $v->color_id,
+                            'name' => $v->color->colorName ?? $v->color->name ?? ('Color '.$v->color_id),
+                            'hex' => $v->color->color ?? '',
+                        ];
+                    }
+                }
+                foreach ($p->sizes ?? [] as $s) {
+                    if (!isset($sizeOptions[$s->id])) {
+                        $sizeOptions[$s->id] = ['id' => (string) $s->id, 'name' => $s->sizeName ?? $s->name ?? '', 'stock' => 0, 'has_stock' => false];
+                    }
+                }
+                foreach ($p->colors ?? [] as $c) {
+                    if (!isset($colorOptions[$c->id])) {
+                        $colorOptions[$c->id] = ['id' => (string) $c->id, 'name' => $c->colorName ?? $c->name ?? '', 'hex' => $c->color ?? ''];
+                    }
+                }
+
+                $variantRows = collect($p->variantPrices ?? []);
+                $hasVariantStock = $variantRows->contains(fn($v) => $v->stock !== null);
+                $totalStock = $hasVariantStock
+                    ? $variantRows->sum(fn($v) => max(0, (int) $v->stock))
+                    : (int) ($p->stock ?? 0);
+
                 return [
                     'id'        => (string) $p->id,
                     'name'      => strip_tags($p->name ?? ''),
                     'price'     => (float)  $p->new_price,
                     'old_price' => (float)  $p->old_price,
+                    'image'     => asset(optional($p->image)->image ?? 'public/uploads/default.webp'),
+                    'stock'     => (int) $totalStock,
+                    'sizes'     => array_values($sizeOptions),
+                    'colors'    => array_values($colorOptions),
+                    'variants'  => $variantRows->map(fn($v) => [
+                        's'  => $v->size_id ? (string) $v->size_id : null,
+                        'c'  => $v->color_id ? (string) $v->color_id : null,
+                        'p'  => (float) $v->price,
+                        'st' => $v->stock === null ? null : (int) $v->stock,
+                    ])->values(),
                 ];
             })->values();
             $_camp_idx      = 0;
@@ -574,248 +628,277 @@
             </div>
         </section>
 
-    <section class="form_sec">
+    <style>
+        /* ===== High-converting checkout redesign ===== */
+        .cmp-checkout-sec{background:linear-gradient(180deg,#f5f7fb 0%,#eef1f7 100%);padding:26px 0 60px;}
+        .cmp-checkout-head{text-align:center;margin-bottom:18px;}
+        .cmp-checkout-head h2{font-size:clamp(19px,4.5vw,28px);font-weight:800;color:#15803d;margin:0 0 6px;}
+        .cmp-checkout-head p{color:#64748b;font-size:14px;margin:0;}
+        .cmp-order-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:18px;align-items:start;}
+        @media(max-width:991px){.cmp-order-grid{grid-template-columns:1fr;}}
+        .cmp-card{background:#fff;border:1px solid #e6eaf1;border-radius:14px;box-shadow:0 6px 22px rgba(15,23,42,.06);overflow:hidden;}
+        .cmp-card-head{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid #eef1f6;background:#fbfcfe;}
+        .cmp-card-head .step{width:30px;height:30px;border-radius:50%;background:#15803d;color:#fff;display:grid;place-items:center;font-weight:800;font-size:14px;flex:0 0 30px;}
+        .cmp-card-head strong{font-size:15.5px;color:#0f172a;display:block;line-height:1.25;}
+        .cmp-card-head small{color:#64748b;font-size:12px;}
+        .cmp-card-body{padding:14px 16px;}
+        /* product select cards */
+        .cmp-products{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;}
+        .cmp-product{position:relative;border:2px solid #e6eaf1;border-radius:12px;overflow:hidden;cursor:pointer;background:#fff;transition:.2s;text-align:center;padding:0;}
+        .cmp-product:hover{border-color:#16a34a;transform:translateY(-2px);box-shadow:0 8px 20px rgba(22,163,74,.15);}
+        .cmp-product.is-selected{border-color:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.18);}
+        .cmp-product.is-selected::after{content:'✓';position:absolute;top:6px;right:6px;width:24px;height:24px;background:#16a34a;color:#fff;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:13px;z-index:2;}
+        .cmp-product img{width:100%;aspect-ratio:1/1;object-fit:cover;display:block;}
+        .cmp-product .info{padding:8px 6px 10px;}
+        .cmp-product .nm{font-size:12.5px;font-weight:700;color:#0f172a;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:32px;}
+        .cmp-product .pr{font-size:14px;font-weight:800;color:#dc2626;margin-top:3px;}
+        .cmp-product .pr del{color:#94a3b8;font-weight:500;font-size:11.5px;margin-left:4px;}
+        .cmp-product .badge-off{position:absolute;top:6px;left:6px;background:#dc2626;color:#fff;font-size:10.5px;font-weight:800;padding:2px 7px;border-radius:20px;z-index:2;}
+        .cmp-product .stock-out-cover{position:absolute;inset:0;background:rgba(255,255,255,.75);display:grid;place-items:center;font-weight:800;color:#dc2626;font-size:13.5px;z-index:3;}
+        /* selected variant chip line */
+        .cmp-selected-variant{display:none;align-items:center;gap:8px;background:#f0fdf4;border:1px dashed #86efac;border-radius:10px;padding:9px 12px;margin-top:10px;font-size:13px;font-weight:700;color:#166534;flex-wrap:wrap;}
+        .cmp-selected-variant.on{display:flex;}
+        .cmp-selected-variant button{border:0;background:#16a34a;color:#fff;font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px;cursor:pointer;}
+        /* cart table */
+        .cmp-cartlist table{margin:0;}
+        .cmp-cartlist .cart_table th{background:#f8fafc;font-size:13px;}
+        .cmp-cartlist .cart_table td{vertical-align:middle;font-size:13.5px;}
+        .cmp-cartlist .quantity{display:inline-flex;align-items:center;border:1.5px solid #e2e8f0;border-radius:8px;overflow:hidden;}
+        .cmp-cartlist .quantity button{width:30px;height:32px;border:0;background:#f8fafc;font-weight:800;font-size:15px;cursor:pointer;color:#15803d;}
+        .cmp-cartlist .quantity button:hover{background:#15803d;color:#fff;}
+        .cmp-cartlist .quantity input{width:38px;height:32px;border:0;text-align:center;font-weight:700;font-size:13.5px;}
+        /* form */
+        .cmp-form-field{margin-bottom:13px;}
+        .cmp-form-field label{display:block;font-size:13.5px;font-weight:700;color:#334155;margin-bottom:5px;}
+        .cmp-form-field label span{color:#dc2626;}
+        .cmp-form-field input,.cmp-form-field select,.cmp-form-field textarea{width:100%;border:1.5px solid #dbe1ea;border-radius:10px;padding:11px 13px;font-size:14.5px;background:#fff;outline:none;transition:.18s;}
+        .cmp-form-field input:focus,.cmp-form-field select:focus,.cmp-form-field textarea:focus{border-color:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.12);}
+        .cmp-form-field .invalid-feedback{display:block;font-size:12px;}
+        .cmp-form-field input.is-invalid,.cmp-form-field select.is-invalid{border-color:#dc2626;}
+        .cmp-submit{width:100%;border:0;cursor:pointer;background:linear-gradient(90deg,#16a34a,#15803d);color:#fff;font-size:17px;font-weight:800;padding:15px 12px;border-radius:12px;box-shadow:0 10px 24px rgba(22,163,74,.35);transition:.2s;display:flex;align-items:center;justify-content:center;gap:8px;animation:cmp-pulse 2s infinite;}
+        .cmp-submit:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(22,163,74,.45);}
+        .cmp-submit:disabled{opacity:.65;cursor:not-allowed;animation:none;transform:none;}
+        @keyframes cmp-pulse{0%,100%{box-shadow:0 10px 24px rgba(22,163,74,.35);}50%{box-shadow:0 10px 34px rgba(22,163,74,.6);}}
+        .cmp-trust{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:13px;padding-top:12px;border-top:1px solid #eef1f6;}
+        .cmp-trust div{text-align:center;font-size:11.5px;color:#64748b;font-weight:600;line-height:1.35;}
+        .cmp-trust i{display:block;font-style:normal;font-size:18px;margin-bottom:2px;}
+        /* sticky mobile CTA */
+        .cmp-sticky-cta{position:fixed;left:0;right:0;bottom:0;z-index:9990;background:linear-gradient(90deg,#16a34a,#15803d);color:#fff;border:0;width:100%;padding:14px 10px;font-size:16.5px;font-weight:800;display:none;align-items:center;justify-content:center;gap:8px;box-shadow:0 -6px 20px rgba(0,0,0,.18);}
+        @media(max-width:767px){.cmp-sticky-cta.on{display:flex;}}
+        /* ===== Variant popup (storefront style) ===== */
+        .cmp-modal{position:fixed;inset:0;z-index:99998;display:none;font-family:inherit;}
+        .cmp-modal.on{display:block;}
+        .cmp-modal-bg{position:absolute;inset:0;background:rgba(15,23,42,.62);backdrop-filter:blur(2px);}
+        .cmp-modal-box{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(680px,94vw);max-height:92vh;overflow:auto;background:#fff;border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.3);animation:cmp-up .28s cubic-bezier(.2,.8,.2,1);}
+        @keyframes cmp-up{from{opacity:0;transform:translate(-50%,-46%);}to{opacity:1;transform:translate(-50%,-50%);}}
+        @media(max-width:640px){.cmp-modal-box{top:auto;bottom:0;left:0;transform:none;width:100%;max-height:94vh;border-radius:18px 18px 0 0;animation:cmp-sheet .3s cubic-bezier(.2,.8,.2,1);}@keyframes cmp-sheet{from{transform:translateY(100%);}to{transform:translateY(0);}}}
+        .cmp-modal-head{position:sticky;top:0;background:#fff;z-index:3;display:flex;align-items:center;justify-content:space-between;padding:13px 18px;border-bottom:1px solid #eef1f6;}
+        .cmp-modal-head h5{margin:0;font-size:15px;font-weight:800;color:#15803d;}
+        .cmp-modal-x{border:0;background:#f1f5f9;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:15px;line-height:1;}
+        .cmp-modal-x:hover{background:#dc2626;color:#fff;}
+        .cmp-modal-body{display:grid;grid-template-columns:minmax(0,190px) minmax(0,1fr);gap:16px;padding:16px;}
+        @media(max-width:640px){.cmp-modal-body{grid-template-columns:1fr;gap:12px;padding:13px;}.cmp-modal-img{max-width:170px;margin:0 auto;}}
+        .cmp-modal-img{border-radius:12px;overflow:hidden;border:1px solid #eef1f6;background:#f8fafc;}
+        .cmp-modal-img img{width:100%;aspect-ratio:1/1;object-fit:cover;display:block;}
+        .cmp-modal-name{font-size:15.5px;font-weight:700;color:#0f172a;margin:0 0 7px;line-height:1.35;}
+        .cmp-modal-price{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:4px;}
+        .cmp-modal-price b{font-size:23px;font-weight:800;color:#dc2626;}
+        .cmp-modal-price del{color:#94a3b8;font-size:14px;}
+        .cmp-modal-save{background:#e8f7ee;color:#12a150;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:20px;}
+        .cmp-modal-stock{font-size:12.5px;font-weight:700;margin-bottom:11px;}
+        .cmp-lbl{font-size:13px;font-weight:800;margin:0 0 6px;color:#0f172a;}
+        .cmp-lbl em{font-style:normal;color:#dc2626;}
+        .cmp-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:13px;}
+        .cmp-chips.cmp-err .cmp-chip{border-color:#dc2626;}
+        .cmp-chip{border:1.5px solid #dbe1ea;background:#fff;min-width:46px;padding:8px 14px;border-radius:9px;font-size:13.5px;font-weight:700;cursor:pointer;transition:.18s;text-align:center;}
+        .cmp-chip:hover{border-color:#16a34a;}
+        .cmp-chip.on{border-color:#16a34a;background:#16a34a;color:#fff;box-shadow:0 4px 12px rgba(22,163,74,.3);}
+        .cmp-chip.off{opacity:.4;cursor:not-allowed;text-decoration:line-through;background:#f5f6f8;}
+        .cmp-chip.off:hover{border-color:#dbe1ea;}
+        .cmp-chip small{display:block;font-size:10px;font-weight:600;color:#12a150;margin-top:2px;}
+        .cmp-chip.on small{color:#d1fae5;}
+        .cmp-chip.off small{color:#dc2626;}
+        .cmp-chip .dot{display:inline-block;width:13px;height:13px;border-radius:50%;border:1px solid rgba(0,0,0,.15);margin-right:6px;vertical-align:-2px;}
+        .cmp-qty{display:inline-flex;align-items:center;border:1.5px solid #dbe1ea;border-radius:9px;overflow:hidden;margin-bottom:13px;}
+        .cmp-qty button{width:40px;height:40px;border:0;background:#f8fafc;font-size:18px;cursor:pointer;color:#15803d;font-weight:800;}
+        .cmp-qty button:hover{background:#15803d;color:#fff;}
+        .cmp-qty input{width:52px;height:40px;border:0;text-align:center;font-size:15px;font-weight:800;outline:none;}
+        .cmp-modal-total{display:flex;justify-content:space-between;align-items:center;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:10px 14px;margin-bottom:13px;}
+        .cmp-modal-total span{font-size:13px;font-weight:700;color:#64748b;}
+        .cmp-modal-total b{font-size:20px;font-weight:800;color:#15803d;}
+        .cmp-modal-confirm{width:100%;border:0;cursor:pointer;background:linear-gradient(90deg,#dc2626,#f97316);color:#fff;font-size:16px;font-weight:800;padding:14px 10px;border-radius:11px;box-shadow:0 8px 20px rgba(220,38,38,.3);transition:.2s;}
+        .cmp-modal-confirm:hover{transform:translateY(-2px);}
+        .cmp-modal-confirm:disabled{opacity:.6;cursor:not-allowed;transform:none;}
+        .cmp-shake{animation:cmp-sh .4s;}
+        @keyframes cmp-sh{0%,100%{transform:translateX(0);}25%{transform:translateX(-6px);}75%{transform:translateX(6px);}}
+        .cmp-toast{position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:100000;background:#12a150;color:#fff;padding:11px 22px;border-radius:30px;font-size:13.5px;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.22);display:none;white-space:nowrap;}
+        .cmp-toast.err{background:#dc2626;}
+        .cmp-toast.on{display:block;}
+        .cmp-busy{position:fixed;inset:0;z-index:99997;background:rgba(255,255,255,.55);display:none;place-items:center;}
+        .cmp-busy.on{display:grid;}
+        .cmp-busy span{width:44px;height:44px;border:4px solid #16a34a;border-top-color:transparent;border-radius:50%;animation:cmp-spin .8s linear infinite;}
+        @keyframes cmp-spin{to{transform:rotate(360deg);}}
+    </style>
+
+    <section class="cmp-checkout-sec form_sec" id="order_form">
         <div class="container">
-           <div class="row">
-             <div class="col-sm-12">
-                <div class="form_inn">
-                    <div class="col-sm-12">
-                        <div class="row">
-                <div class="col-sm-12">
-                    <h2 class="campaign_offer">অফারটি সীমিত সময়ের জন্য, তাই অফার শেষ হওয়ার আগেই অর্ডার করুন</h2>
-                    @if($campaign_data->note)
-                    <p class="my-1 text-center">
-                        {!! $campaign_data->note !!}
-                    </p>
-                    @endif
-                </div>
-                
+            <div class="cmp-checkout-head">
+                <h2>অর্ডার করতে নিচের ফর্মটি পূরণ করুন</h2>
+                <p>অফারটি সীমিত সময়ের জন্য — স্টক শেষ হওয়ার আগেই অর্ডার করুন ✅ ক্যাশ অন ডেলিভারি</p>
+                @if($campaign_data->note)
+                    <p class="my-1">{!! $campaign_data->note !!}</p>
+                @endif
             </div>
-            <div class="row order_by">
-                <div class="col-lg-7 cust-order-1">
-                    <div class="cart_details">
-                        @if($products->count()>1)
-                        <div class="card mb-2 ">
-                          <div class="card-header">
-                                <h5 class="potro_font">একটি পণ্য সিলেক্ট করুন </h5>
-                            </div>  
-                             <div class="card-body">
-                                <div class="row g-2">
-                                    @foreach($products as $product)
-                                        <div class="col-md-3 col-6"> <!-- Adjusted column width for smaller cards -->
-                                            <div class="border shadow"> <!-- Wrap the card with form-check for better usability -->
-                                                <input type="radio" class="form-check-input" name="product" id="product_{{ $product->id }}" value="{{ $product->id }}" {{ $loop->first ? 'checked' : '' }} style="display: none;" onchange="updateCart('{{ $product->id }}')">
-                                                <label for="product_{{ $product->id }}" class="card shadow-sm product-card {{ $loop->first ? 'selected' : '' }}" style="cursor: pointer;"> <!-- Add class for styling -->
-                                                    <img src="{{ asset(optional($product->image)->image ?? 'public/uploads/default.webp') }}" class="card-img-top" alt="{{ $product->name }}" style="height: 100px; object-fit: cover;">
-                                                    <div class="card-body p-1 text-center"> <!-- Centered text for a better layout -->
-                                                        <div class="card-title">{{ Str::limit($product->name, 20) }}</div>
-                                                        <div class="card-text mb-1">৳{{ $product->new_price }} <del>৳{{ $product->old_price }}</del></div>
-                                                    </div>
-                                                </label>
-                                            </div>
-                                        </div>
-                                    @endforeach
-                                </div>
-                             </div>
+
+            <div class="cmp-order-grid">
+                {{-- ===== Left: product select + cart summary ===== --}}
+                <div>
+                    <div class="cmp-card mb-3">
+                        <div class="cmp-card-head">
+                            <span class="step">১</span>
+                            <div><strong>আপনার পণ্য {{ $products->count() > 1 ? 'সিলেক্ট' : 'কনফার্ম' }} করুন</strong><small>ছবিতে ক্লিক করে সাইজ/কালার বেছে নিন</small></div>
                         </div>
-                        @endif
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="potro_font">পণ্যের বিবরণ </h5>
+                        <div class="cmp-card-body">
+                            <div class="cmp-products">
+                                @foreach($products as $product)
+                                    @php
+                                        $vRows = $product->variantPrices ?? collect();
+                                        $hasVStock = $vRows->contains(fn($v) => $v->stock !== null);
+                                        $pStock = $hasVStock ? $vRows->sum(fn($v) => max(0,(int)$v->stock)) : (int)($product->stock ?? 0);
+                                        $off = ((float)$product->old_price > (float)$product->new_price && (float)$product->old_price > 0)
+                                            ? round((($product->old_price - $product->new_price)/$product->old_price)*100) : 0;
+                                    @endphp
+                                    <button type="button" class="cmp-product {{ $loop->first ? 'is-selected' : '' }}" data-cmp-product="{{ $product->id }}" {{ $pStock <= 0 ? 'disabled' : '' }}>
+                                        @if($off > 0)<span class="badge-off">-{{ $off }}%</span>@endif
+                                        <img src="{{ asset(optional($product->image)->image ?? 'public/uploads/default.webp') }}" alt="{{ $product->name }}" loading="lazy">
+                                        <span class="info">
+                                            <span class="nm">{{ Str::limit($product->name, 40) }}</span>
+                                            <span class="pr">৳{{ number_format((float)$product->new_price,0) }} @if((float)$product->old_price > (float)$product->new_price)<del>৳{{ number_format((float)$product->old_price,0) }}</del>@endif</span>
+                                        </span>
+                                        @if($pStock <= 0)<span class="stock-out-cover">স্টক আউট</span>@endif
+                                    </button>
+                                @endforeach
                             </div>
-                            <div class="card-body cartlist  table-responsive">
-                                <table class="cart_table table table-bordered table-striped text-center mb-0">
-                                    <thead>
-                                       <tr>
-                                          
-                                          <th style="width: 40%;">প্রোডাক্ট</th>
-                                          <th style="width: 20%;">পরিমাণ</th>
-                                          <th style="width: 20%;">মূল্য</th>
-                                         </tr>
-                                    </thead>
-    
-                                    <tbody>
-                                        @foreach(Cart::instance('shopping')->content() as $value)
-                                        <tr>
-                                          
-                                            <td class="text-left">
-                                                 <a style="font-size: 14px;" href="{{route('product',$value->options->slug)}}"><img src="{{ asset($value->options->image ?? 'public/uploads/default.webp') }}" height="30" width="30"> {{Str::limit($value->name,20)}}</a>
-                                                @php
-                                                    $product = $products->firstWhere('id', $value->id);
-                                                @endphp
-                                             
-                                               @if($product && ($product->sizes->isNotEmpty() || $product->colors->isNotEmpty()))
-                                                <div class="row g-1 mt-2">
-                                                    <!-- Size Selector -->
-                                                    @if($product->sizes->isNotEmpty())
-                                                    <div class="col-6">
-                                                        
-                                                        <select id="size-selector-{{ $value->rowId }}" class="form-select form-select-sm cart-size-selector" data-id="{{ $value->rowId }}">
-                                                            <option>Select an option</option>
-                                                            @foreach($product->sizes as $size)
-                                                            <option value="{{ $size->sizeName }}" {{ $size->sizeName == $value->options->product_size ? 'selected' : '' }}>
-                                                                {{ $size->sizeName }}
-                                                            </option>
-                                                            @endforeach
-                                                        </select>
-                                                        <label for="size-selector-{{ $value->rowId }}" class="form-label text-muted text-start" style="font-size: 0.875rem;">Size:
-                                                        @if($value->options->product_size)
-                                                          {{$value->options->product_size}}
-                                                        @endif
-                                                        </label>
-                                                    </div>
-                                                    @endif
-                                                
-                                                    <!-- Color Selector -->
-                                                    @if($product->colors->isNotEmpty())
-                                                    <div class="col-6">
-                                                        <select id="color-selector-{{ $value->rowId }}" class="form-select form-select-sm cart-color-selector" data-id="{{ $value->rowId }}">
-                                                            <option>Select an option</option>
-                                                            @foreach($product->colors as $color)
-                                                            <option value="{{ $color->colorName }}" {{ $color->colorName == $value->options->product_color ? 'selected' : '' }}>
-                                                                {{ $color->colorName }}
-                                                            </option>
-                                                            @endforeach
-                                                        </select>
-                                                        <label for="color-selector-{{ $value->rowId }}" class="form-label text-muted text-start" style="font-size: 0.875rem;">Color:
-                                                        @if($value->options->product_color)
-                                                           {{ $value->options->product_color }}
-                                                        @endif
-                                                        </label>
-                                                    </div>
-                                                    @endif
-                                                </div>
-                                                @endif
-                                            </td>
-                                            <td width="15%" class="cart_qty">
-                                                <div class="qty-cart vcart-qty">
-                                                    <div class="quantity">
-                                                        <button class="minus cart_decrement"  data-id="{{$value->rowId}}">-</button>
-                                                        <input type="text" value="{{$value->qty}}" readonly />
-                                                        <button class="plus  cart_increment" data-id="{{$value->rowId}}">+</button>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>৳{{$value->price*$value->qty}}</td>
-                                        </tr>
-                                        @endforeach
-                                    </tbody>
-                                    <tfoot>
-                                         <tr>
-                                          <th colspan="2" class="text-end px-4">মোট</th>
-                                          <td>
-                                           <span id="net_total"><span class="alinur">৳ </span><strong>{{$subtotal}}</strong></span>
-                                          </td>
-                                         </tr>
-                                         <tr>
-                                          <th colspan="2" class="text-end px-4">ডেলিভারি চার্জ</th>
-                                          <td>
-                                           <span id="cart_shipping_cost"><span class="alinur">৳ </span><strong>{{$shipping}}</strong></span>
-                                          </td>
-                                         </tr>
-                                         <tr>
-                                          <th colspan="2" class="text-end px-4">সর্বমোট</th>
-                                          <td>
-                                           <span id="grand_total"><span class="alinur">৳ </span><strong>{{$subtotal+$shipping}}</strong></span>
-                                          </td>
-                                         </tr>
-                                        </tfoot>
-                                </table>
-    
+                            <div class="cmp-selected-variant" id="cmpSelectedVariant">
+                                <span id="cmpSelectedVariantText"></span>
+                                <button type="button" id="cmpChangeVariant">পরিবর্তন করুন</button>
                             </div>
                         </div>
                     </div>
-                </div>
-                <div class="col-lg-5 cus-order-2">
-                    <div class="checkout-shipping" id="order_form">
-                        <form action="{{route('customer.ordersave')}}" method="POST" data-parsley-validate="">
-                        @csrf
-                        <input type="hidden" name="payment_method" value="cod">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="potro_font">আপনার ইনফরমেশন দিন  </h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-sm-12">
-                                        <div class="form-group mb-3">
-                                            <label for="name">আপনার নাম লিখুন * </label>
-                                            <input type="text" id="name" class="form-control @error('name') is-invalid @enderror" name="name" value="{{old('name')}}" placeholder="নাম" required>
-                                            @error('name')
-                                                <span class="invalid-feedback" role="alert">
-                                                    <strong>{{ $message }}</strong>
-                                                </span>
-                                            @enderror
-                                        </div>
-                                    </div>
-                                    <!-- col-end -->
-                                    <div class="col-sm-12">
-                                        <div class="form-group mb-3">
-                                            <label for="phone">আপনার মোবাইল লিখুন *</label>
-                                            <input type="number" minlength="11" id="number" maxlength="11" pattern="0[0-9]+" title="please enter number only and 0 must first character" title="Please enter an 11-digit number." id="phone" class="form-control @error('phone') is-invalid @enderror" name="phone" value="{{old('phone')}}" placeholder="+৮৮ বাদে ১১ সংখ্যা "  required>
-                                            @error('phone')
-                                                <span class="invalid-feedback" role="alert">
-                                                    <strong>{{ $message }}</strong>
-                                                </span>
-                                            @enderror
-                                        </div>
-                                    </div>
-                                    <!-- col-end -->
-                                    <div class="col-sm-12">
-                                        <div class="form-group mb-3">
-                                            <label for="address">আপনার ঠিকানা লিখুন   *</label>
-                                            <input type="text" id="address" class="form-control @error('address') is-invalid @enderror" placeholder="জেলা, থানা, গ্রাম " name="address" value="{{old('address')}}"  required>
-                                            @error('address')
-                                                <span class="invalid-feedback" role="alert">
-                                                    <strong>{{ $message }}</strong>
-                                                </span>
-                                            @enderror
-                                        </div>
-                                    </div>
-                                    <div class="col-sm-12">
-                                        <div class="form-group mb-3">
-                                            <label for="area">আপনার এরিয়া সিলেক্ট করুন  *</label>
-                                            <select id="area" class="form-control @error('area') is-invalid @enderror" name="area"   required>
-                                                @foreach($shippingcharge as $key=>$value)
-                                                <option value="{{$value->id}}" {{ (string) old('area') === (string) $value->id ? 'selected' : '' }}>{{$value->name}}</option>
-                                                @endforeach
-                                            </select>
-                                            @error('area')
-                                                <span class="invalid-feedback" role="alert">
-                                                    <strong>{{ $message }}</strong>
-                                                </span>
-                                            @enderror
-                                        </div>
-                                    </div>
-                                    <!-- col-end -->
-                                    <div class="col-sm-12">
-                                        <div class="form-group">
-                                            <button class="order_place" type="submit">অর্ডার কন্ফার্ম করুন </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+
+                    <div class="cmp-card">
+                        <div class="cmp-card-head">
+                            <span class="step">২</span>
+                            <div><strong>আপনার অর্ডার</strong><small>পরিমাণ ও মোট মূল্য যাচাই করুন</small></div>
                         </div>
-                        <!-- card end -->
-                    </form>
-                    </div>
-                    @if($campaign_data->billing_details)
-                    <p class="my-1 text-center">
-                        {!! $campaign_data->billing_details !!}
-                    </p>
-                    @endif
-                </div>
-                <!-- col end -->
-                
-            <!-- col end -->
-            </div>
+                        <div class="cmp-card-body cartlist cmp-cartlist table-responsive">
+                            @include('frontEnd.layouts.ajax.campaign-cart')
+                        </div>
                     </div>
                 </div>
 
-             </div>
+                {{-- ===== Right: checkout form ===== --}}
+                <div>
+                    <div class="cmp-card">
+                        <div class="cmp-card-head">
+                            <span class="step">৩</span>
+                            <div><strong>ডেলিভারি তথ্য দিন</strong><small>সঠিক তথ্য দিলে দ্রুত ডেলিভারি পাবেন</small></div>
+                        </div>
+                        <div class="cmp-card-body">
+                            @if($errors->any())
+                                <div class="alert alert-danger py-2" role="alert" style="font-size:13px;">
+                                    <strong>তথ্যগুলো আবার যাচাই করুন:</strong>
+                                    <ul class="mb-0 ps-3">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+                                </div>
+                            @endif
+                            <form action="{{ route('customer.ordersave') }}" method="POST" id="cmpOrderForm">
+                                @csrf
+                                <input type="hidden" name="payment_method" value="cod">
+                                <div class="cmp-form-field">
+                                    <label for="cmp-name">আপনার নাম <span>*</span></label>
+                                    <input type="text" id="cmp-name" name="name" value="{{ old('name') }}" placeholder="আপনার সম্পূর্ণ নাম" autocomplete="name" class="@error('name') is-invalid @enderror" required>
+                                    @error('name')<span class="invalid-feedback" role="alert"><strong>{{ $message }}</strong></span>@enderror
+                                </div>
+                                <div class="cmp-form-field">
+                                    <label for="cmp-phone">মোবাইল নম্বর <span>*</span></label>
+                                    <input type="tel" id="cmp-phone" name="phone" value="{{ old('phone') }}" placeholder="01XXXXXXXXX" inputmode="numeric" pattern="01[0-9]{9}" maxlength="11" autocomplete="tel" title="১১ ডিজিটের মোবাইল নম্বর দিন (01 দিয়ে শুরু)" class="@error('phone') is-invalid @enderror" required>
+                                    @error('phone')<span class="invalid-feedback" role="alert"><strong>{{ $message }}</strong></span>@enderror
+                                </div>
+                                <div class="cmp-form-field">
+                                    <label for="cmp-address">সম্পূর্ণ ঠিকানা <span>*</span></label>
+                                    <input type="text" id="cmp-address" name="address" value="{{ old('address') }}" placeholder="জেলা, থানা, এলাকা/গ্রাম, বাড়ির ঠিকানা" autocomplete="street-address" class="@error('address') is-invalid @enderror" required>
+                                    @error('address')<span class="invalid-feedback" role="alert"><strong>{{ $message }}</strong></span>@enderror
+                                </div>
+                                <div class="cmp-form-field">
+                                    <label for="area">ডেলিভারি এরিয়া <span>*</span></label>
+                                    <select id="area" name="area" class="@error('area') is-invalid @enderror" required>
+                                        @foreach($shippingcharge as $key=>$value)
+                                            <option value="{{ $value->id }}" {{ (string) old('area') === (string) $value->id ? 'selected' : '' }}>{{ $value->name }} — ৳{{ number_format((float) $value->amount, 0) }}</option>
+                                        @endforeach
+                                    </select>
+                                    @error('area')<span class="invalid-feedback" role="alert"><strong>{{ $message }}</strong></span>@enderror
+                                </div>
+                                <button class="cmp-submit order_place" type="submit" id="cmpSubmitBtn">🛒 অর্ডার কনফার্ম করুন</button>
+                                <div class="cmp-trust">
+                                    <div><i>🚚</i> ক্যাশ অন ডেলিভারি</div>
+                                    <div><i>🔄</i> সহজ রিটার্ন</div>
+                                    <div><i>✅</i> ১০০% অরিজিনাল</div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    @if($campaign_data->billing_details)
+                        <p class="my-2 text-center" style="font-size:13px;color:#64748b;">{!! $campaign_data->billing_details !!}</p>
+                    @endif
+                </div>
             </div>
         </div>
     </section>
+
+    {{-- ===== Sticky mobile CTA ===== --}}
+    <button type="button" class="cmp-sticky-cta on" id="cmpStickyCta">🛒 এখনই অর্ডার করুন — ক্যাশ অন ডেলিভারি</button>
+
+    {{-- ===== Size/Color popup (storefront style) ===== --}}
+    <div class="cmp-modal" id="cmpModal" aria-hidden="true">
+        <div class="cmp-modal-bg" onclick="cmpClose()"></div>
+        <div class="cmp-modal-box">
+            <div class="cmp-modal-head">
+                <h5>🛒 সাইজ ও কালার বেছে নিন</h5>
+                <button type="button" class="cmp-modal-x" onclick="cmpClose()" aria-label="Close">✕</button>
+            </div>
+            <div class="cmp-modal-body">
+                <div class="cmp-modal-img"><img id="cmpMoImg" src="" alt="Product"></div>
+                <div>
+                    <h4 class="cmp-modal-name" id="cmpMoName"></h4>
+                    <div class="cmp-modal-price">
+                        <b id="cmpMoPrice"></b>
+                        <del id="cmpMoOld"></del>
+                        <span class="cmp-modal-save" id="cmpMoSave"></span>
+                    </div>
+                    <div class="cmp-modal-stock" id="cmpMoStock"></div>
+                    <div id="cmpSizeWrap" style="display:none">
+                        <p class="cmp-lbl">সাইজ সিলেক্ট করুন <em>*</em></p>
+                        <div class="cmp-chips" id="cmpSizes"></div>
+                    </div>
+                    <div id="cmpColorWrap" style="display:none">
+                        <p class="cmp-lbl">কালার সিলেক্ট করুন <em>*</em></p>
+                        <div class="cmp-chips" id="cmpColors"></div>
+                    </div>
+                    <p class="cmp-lbl">পরিমাণ</p>
+                    <div class="cmp-qty">
+                        <button type="button" onclick="cmpQty(-1)">−</button>
+                        <input type="text" id="cmpQtyBox" value="1" readonly>
+                        <button type="button" onclick="cmpQty(1)">+</button>
+                    </div>
+                    <div class="cmp-modal-total"><span>সর্বমোট</span><b id="cmpMoTotal">৳ 0</b></div>
+                    <button type="button" class="cmp-modal-confirm" id="cmpMoConfirm">✓ কনফার্ম করুন — চেকআউটে যোগ হবে</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="cmp-toast" id="cmpToast" role="status"></div>
+    <div class="cmp-busy" id="cmpBusy"><span></span></div>
 
         <script src="{{ asset('public/frontEnd/campaign/js') }}/jquery-2.1.4.min.js"></script>
         <script src="{{ asset('public/frontEnd/campaign/js') }}/all.js"></script>
@@ -937,84 +1020,7 @@
                 }
             });
         </script>
-        <script>
-            // Update the cart and highlight the selected card
-            function updateCart(productId) {
-                const productCards = document.querySelectorAll('.product-card');
-                productCards.forEach(card => card.classList.remove('selected'));
 
-                const selectedCard = document.getElementById(`product_${productId}`).nextElementSibling;
-                selectedCard.classList.add('selected');
-
-                // ===== AddToCart Tracking =====
-                var selProd = window._campaignProducts
-                    ? window._campaignProducts.find(function(p){ return p.id === String(productId); })
-                    : null;
-                var prodPrice = selProd ? selProd.price : 0;
-                var prodName  = selProd ? selProd.name  : '';
-
-                // GTM DataLayer — add_to_cart
-                dataLayer.push({'ecommerce': null});
-                dataLayer.push({
-                    'event': 'add_to_cart',
-                    'ecommerce': {
-                        'currency': 'BDT',
-                        'value': prodPrice,
-                        'items': [{
-                            'item_id':   String(productId),
-                            'item_name': prodName,
-                            'price':     prodPrice,
-                            'quantity':  1
-                        }]
-                    }
-                });
-
-                // Facebook Pixel — AddToCart
-                if (typeof fbq !== 'undefined') {
-                    fbq('track', 'AddToCart', {
-                        content_ids:  [String(productId)],
-                        content_name: prodName,
-                        content_type: 'product',
-                        value:        prodPrice,
-                        currency:     'BDT'
-                    }, {eventID: 'atc_' + productId + '_' + Math.floor(Date.now()/1000)});
-                }
-
-                // TikTok Pixel — AddToCart
-                if (typeof ttq !== 'undefined') {
-                    ttq.track('AddToCart', {
-                        content_id:   String(productId),
-                        content_name: prodName,
-                        content_type: 'product',
-                        value:        prodPrice,
-                        currency:     'BDT',
-                        quantity:     1
-                    });
-                }
-                // ==============================
-
-                if (productId) {
-                    $.ajax({
-                        type: "GET",
-                        data: { id: productId, campaign: 1 },
-                        url: "{{route('cart.changeProduct')}}",
-                        success: function (data) {
-                            if (data) {
-                                $(".cartlist").html(data);
-                            }
-                        },
-                    });
-                }
-            }
-
-            // Automatically highlight the first card on page load
-            document.addEventListener('DOMContentLoaded', function() {
-                const firstCard = document.querySelector('.product-card');
-                if (firstCard) {
-                    firstCard.classList.add('selected');
-                }
-            });
-        </script>
         <script>
             @if($campaign_data->deadline)
             // Set the deadline from the campaign data
@@ -1049,58 +1055,290 @@
             @else
             document.getElementById("countdown").style.display = "none";
             @endif
-               // Event listener for size selector change
-            $('.cart-size-selector').on('change', function() {
-                var rowId = $(this).data('id'); // Get the row ID
-                var selectedSize = $(this).val(); // Get the selected size
-            
-                if (rowId) {
-                    $.ajax({
-                        type: "GET", // Change to GET if your route accepts GET requests
-                        data: {
-                            'id': rowId,
-                            'product_size': selectedSize // New size to update
-                        },
-                        url: "{{ route('cart.update') }}", // Use the same route for updating size
-                        success: function(data) {
-                            if (data) {
-                                $(".cartlist").html(data); // Update the cart list UI with new data
-                                return cart_count(); // Update the cart count
-                            }
-                        },
-                        error: function() {
-                            alert('An error occurred while updating the size. Please try again.');
-                        }
+        </script>
+        <script>
+        /* ============================================================
+           Campaign checkout: product select → variant popup → cart
+           ============================================================ */
+        (function () {
+            'use strict';
+
+            var PRODUCTS = window._campaignProducts || [];
+            var CHANGE_URL = "{{ route('cart.changeProduct') }}";
+            var st = { p: null, size: null, color: null, qty: 1, price: 0, stock: 0 };
+            var busyEl = document.getElementById('cmpBusy');
+            var toastEl = document.getElementById('cmpToast');
+            var modal = document.getElementById('cmpModal');
+            var toastTimer = null;
+
+            function $id(x) { return document.getElementById(x); }
+            function fmt(n) { return Number(n || 0).toLocaleString('en-US'); }
+            function findProduct(id) { return PRODUCTS.find(function (p) { return String(p.id) === String(id); }); }
+
+            function toast(msg, err) {
+                clearTimeout(toastTimer);
+                toastEl.textContent = msg;
+                toastEl.classList.toggle('err', !!err);
+                toastEl.classList.add('on');
+                toastTimer = setTimeout(function () { toastEl.classList.remove('on'); }, 3200);
+            }
+            function busy(v) { busyEl.classList.toggle('on', !!v); }
+
+            /* ---------- Tracking ---------- */
+            function trackATC(p, price, qty) {
+                try {
+                    window.dataLayer = window.dataLayer || [];
+                    dataLayer.push({ ecommerce: null });
+                    dataLayer.push({ event: 'add_to_cart', ecommerce: { currency: 'BDT', value: price * qty, items: [{ item_id: String(p.id), item_name: p.name, price: price, quantity: qty }] } });
+                    if (typeof fbq !== 'undefined') {
+                        fbq('track', 'AddToCart', { content_ids: [String(p.id)], content_name: p.name, content_type: 'product', value: price * qty, currency: 'BDT' }, { eventID: 'atc_' + p.id + '_' + Math.floor(Date.now() / 1000) });
+                    }
+                    if (typeof ttq !== 'undefined' && ttq.track) {
+                        ttq.track('AddToCart', { content_id: String(p.id), content_name: p.name, content_type: 'product', value: price * qty, currency: 'BDT', quantity: qty });
+                    }
+                } catch (e) {}
+            }
+
+            /* ---------- Popup open ---------- */
+            window.cmpOpen = function (productId) {
+                var p = findProduct(productId);
+                if (!p) return;
+                st = { p: p, size: null, color: null, qty: 1, price: p.price, stock: p.stock };
+
+                $id('cmpMoImg').src = p.image || '';
+                $id('cmpMoName').textContent = p.name;
+
+                buildChips('cmpSizes', 'cmpSizeWrap', p.sizes || [], 'size');
+                buildChips('cmpColors', 'cmpColorWrap', p.colors || [], 'color');
+
+                /* একটাই অপশন থাকলে অটো-সিলেক্ট (কম ক্লিক = বেশি কনভার্শন) */
+                if ((p.sizes || []).length === 1) pickChip('size', p.sizes[0].id, 0);
+                if ((p.colors || []).length === 1) pickChip('color', p.colors[0].id, 0);
+
+                /* সাইজ/কালার কিছুই না থাকলে পপআপ ছাড়াই সরাসরি কার্টে */
+                if (!(p.sizes || []).length && !(p.colors || []).length) {
+                    confirmSelection();
+                    return;
+                }
+
+                sync();
+                setQty(1);
+                modal.classList.add('on');
+                document.body.style.overflow = 'hidden';
+            };
+            window.cmpClose = function () { modal.classList.remove('on'); document.body.style.overflow = ''; };
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') cmpClose(); });
+
+            /* ---------- Chips ---------- */
+            function buildChips(boxId, wrapId, list, type) {
+                var box = $id(boxId), wrap = $id(wrapId);
+                box.innerHTML = '';
+                box.classList.remove('cmp-err');
+                if (!list.length) { wrap.style.display = 'none'; return; }
+                wrap.style.display = '';
+                list.forEach(function (o, idx) {
+                    var b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'cmp-chip';
+                    b.dataset.id = o.id;
+                    var stockNote = '';
+                    if (type === 'size' && o.has_stock) {
+                        stockNote = '<small>' + (o.stock > 0 ? o.stock + ' টি আছে' : 'স্টক শেষ') + '</small>';
+                        if (Number(o.stock) <= 0) b.classList.add('off');
+                    }
+                    b.innerHTML = (type === 'color' && o.hex ? '<span class="dot" style="background:' + o.hex + '"></span>' : '') + o.name + stockNote;
+                    b.onclick = function () { if (!b.classList.contains('off')) pickChip(type, o.id, idx); };
+                    box.appendChild(b);
+                });
+            }
+
+            function pickChip(type, id, idx) {
+                var box = $id(type === 'size' ? 'cmpSizes' : 'cmpColors');
+                [].forEach.call(box.children, function (b, i) { b.classList.toggle('on', i === idx); });
+                box.classList.remove('cmp-err');
+                st[type] = id;
+                sync();
+                setQty(st.qty);
+            }
+
+            /* ---------- Variant sync: price/stock + availability ---------- */
+            function markAvail(boxId, fn) {
+                var box = $id(boxId);
+                [].forEach.call(box.children, function (b) {
+                    var ok = fn(b.dataset.id);
+                    b.classList.toggle('off', !ok);
+                    if (!ok) b.classList.remove('on');
+                });
+            }
+
+            function sync() {
+                var p = st.p; if (!p) return;
+                var vs = p.variants || [];
+                if (vs.length) {
+                    markAvail('cmpSizes', function (id) {
+                        return vs.some(function (v) { return v.s == id && (st.color == null || v.c == null || v.c == st.color) && (v.st === null || v.st > 0); });
                     });
+                    markAvail('cmpColors', function (id) {
+                        return vs.some(function (v) { return v.c == id && (st.size == null || v.s == null || v.s == st.size) && (v.st === null || v.st > 0); });
+                    });
+
+                    var match = vs.filter(function (v) {
+                        return (st.size == null || v.s == null || v.s == st.size) &&
+                               (st.color == null || v.c == null || v.c == st.color);
+                    });
+                    var chosen = (!(p.sizes || []).length || st.size != null) && (!(p.colors || []).length || st.color != null);
+                    if (chosen && match.length) {
+                        if (match[0].p > 0) st.price = match[0].p; else st.price = p.price;
+                        var rows = match.filter(function (v) { return v.st !== null; });
+                        st.stock = rows.length
+                            ? ((st.color != null || rows.length === 1) ? Number(rows[0].st) : rows.reduce(function (s, v) { return s + Number(v.st); }, 0))
+                            : p.stock;
+                    } else {
+                        st.price = p.price;
+                        st.stock = p.stock;
+                    }
+                }
+
+                $id('cmpMoPrice').textContent = '৳ ' + fmt(st.price);
+                var oldEl = $id('cmpMoOld'), saveEl = $id('cmpMoSave');
+                if (p.old_price && p.old_price > st.price) {
+                    oldEl.textContent = '৳ ' + fmt(p.old_price);
+                    saveEl.textContent = 'সাশ্রয় ৳ ' + fmt(p.old_price - st.price);
+                    oldEl.style.display = ''; saveEl.style.display = '';
+                } else { oldEl.style.display = 'none'; saveEl.style.display = 'none'; }
+
+                var stEl = $id('cmpMoStock');
+                if (st.stock !== null && st.stock <= 0) { stEl.textContent = '❌ এই ভ্যারিয়েন্টটি স্টকে নেই'; stEl.style.color = '#dc2626'; }
+                else if (st.stock > 0 && st.stock <= 20) { stEl.textContent = '🔥 তাড়াতাড়ি করুন! মাত্র ' + st.stock + ' টি বাকি'; stEl.style.color = '#ea580c'; }
+                else { stEl.textContent = '✅ স্টকে আছে'; stEl.style.color = '#12a150'; }
+            }
+
+            /* ---------- Qty ---------- */
+            window.cmpQty = function (d) { setQty(st.qty + d); };
+            function setQty(q) {
+                var max = (st.stock && st.stock > 0) ? st.stock : 99;
+                st.qty = Math.max(1, Math.min(q, max));
+                $id('cmpQtyBox').value = st.qty;
+                $id('cmpMoTotal').textContent = '৳ ' + fmt(st.price * st.qty);
+            }
+
+            /* ---------- Validate + confirm → auto add to checkout cart ---------- */
+            function shake(id) {
+                var b = $id(id);
+                b.classList.add('cmp-err', 'cmp-shake');
+                setTimeout(function () { b.classList.remove('cmp-shake'); }, 420);
+                b.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            }
+
+            function confirmSelection() {
+                var p = st.p; if (!p) return;
+                if ((p.sizes || []).length && !st.size) { shake('cmpSizes'); return; }
+                if ((p.colors || []).length && !st.color) { shake('cmpColors'); return; }
+                if (st.stock !== null && st.stock <= 0) { toast('এই ভ্যারিয়েন্টটি স্টকে নেই', 1); return; }
+
+                var btn = $id('cmpMoConfirm');
+                btn.disabled = true;
+                busy(true);
+
+                $.ajax({
+                    type: 'GET',
+                    url: CHANGE_URL,
+                    data: { id: p.id, campaign: 1, product_size: st.size || '', product_color: st.color || '', qty: st.qty },
+                    success: function (html) {
+                        $('.cartlist').html(html);
+                        markSelectedCard(p.id);
+                        showSelectedVariant(p);
+                        trackATC(p, st.price, st.qty);
+                        cmpClose();
+                        toast('✔ কার্টে যোগ হয়েছে — এখন ডেলিভারি তথ্য দিন');
+                        var form = document.getElementById('cmpOrderForm');
+                        if (form && window.matchMedia('(max-width: 767px)').matches) {
+                            form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                    },
+                    error: function (xhr) {
+                        var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'কার্ট আপডেট করা যায়নি। আবার চেষ্টা করুন।';
+                        toast(msg, 1);
+                    },
+                    complete: function () { btn.disabled = false; busy(false); }
+                });
+            }
+            $id('cmpMoConfirm').addEventListener('click', confirmSelection);
+
+            function markSelectedCard(id) {
+                document.querySelectorAll('.cmp-product').forEach(function (c) {
+                    c.classList.toggle('is-selected', String(c.dataset.cmpProduct) === String(id));
+                });
+            }
+
+            function showSelectedVariant(p) {
+                var box = $id('cmpSelectedVariant');
+                var parts = [];
+                if (st.size) {
+                    var so = (p.sizes || []).find(function (s) { return String(s.id) === String(st.size); });
+                    if (so) parts.push('সাইজ: ' + so.name);
+                }
+                if (st.color) {
+                    var co = (p.colors || []).find(function (c) { return String(c.id) === String(st.color); });
+                    if (co) parts.push('কালার: ' + co.name);
+                }
+                parts.push('পরিমাণ: ' + st.qty + ' টি');
+                $id('cmpSelectedVariantText').textContent = '✓ ' + p.name.substring(0, 30) + ' — ' + parts.join(' | ');
+                box.classList.add('on');
+                box.dataset.productId = p.id;
+            }
+
+            /* ---------- Product card click → popup ---------- */
+            document.addEventListener('click', function (e) {
+                var card = e.target.closest('.cmp-product');
+                if (card && !card.disabled) {
+                    e.preventDefault();
+                    cmpOpen(card.dataset.cmpProduct);
                 }
             });
-            
-            
-            // Event listener for color selector change
-            $('.cart-color-selector').on('change', function() {
-                var rowId = $(this).data('id'); // Get the row ID
-                var selectedColor = $(this).val(); // Get the selected color
-            
-                if (rowId) {
-                    $.ajax({
-                        type: "GET", // Change to GET if your route accepts GET requests
-                        data: {
-                            'id': rowId,
-                            'product_color': selectedColor // New size to update
-                        },
-                        url: "{{ route('cart.update') }}", // Use the same route for updating size
-                        success: function(data) {
-                            if (data) {
-                                $(".cartlist").html(data); // Update the cart list UI with new data
-                                return cart_count(); // Update the cart count
-                            }
-                        },
-                        error: function() {
-                            alert('An error occurred while updating the size. Please try again.');
-                        }
-                    });
-                }
+            $id('cmpChangeVariant').addEventListener('click', function () {
+                var id = $id('cmpSelectedVariant').dataset.productId;
+                if (id) cmpOpen(id);
             });
+
+            /* ---------- Sticky mobile CTA ---------- */
+            var sticky = document.getElementById('cmpStickyCta');
+            if (sticky) {
+                sticky.addEventListener('click', function () {
+                    var sec = document.getElementById('order_form');
+                    if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    if (window.dataLayer) dataLayer.push({ event: 'click_order_now_button', campaign_id: window._campaignData ? window._campaignData.id : '', campaign_name: window._campaignData ? window._campaignData.name : '' });
+                });
+                var formSec = document.getElementById('order_form');
+                if (formSec && 'IntersectionObserver' in window) {
+                    new IntersectionObserver(function (entries) {
+                        sticky.classList.toggle('on', !entries[0].isIntersecting);
+                    }, { threshold: 0.08 }).observe(formSec);
+                }
+            }
+
+            /* ---------- Order form guard: variant required before submit ---------- */
+            var orderForm = document.getElementById('cmpOrderForm');
+            if (orderForm) {
+                orderForm.addEventListener('submit', function (e) {
+                    var first = PRODUCTS[0];
+                    var selectedBox = $id('cmpSelectedVariant');
+                    var needsVariant = PRODUCTS.some(function (p) {
+                        return document.querySelector('.cmp-product.is-selected[data-cmp-product="' + p.id + '"]') &&
+                            (((p.sizes || []).length) || ((p.colors || []).length));
+                    });
+                    if (needsVariant && !selectedBox.classList.contains('on')) {
+                        e.preventDefault();
+                        var selCard = document.querySelector('.cmp-product.is-selected');
+                        toast('অর্ডারের আগে সাইজ/কালার সিলেক্ট করুন', 1);
+                        if (selCard) cmpOpen(selCard.dataset.cmpProduct);
+                        return false;
+                    }
+                    var btn = $id('cmpSubmitBtn');
+                    if (btn) { btn.disabled = true; btn.textContent = '⏳ অর্ডার প্রসেস হচ্ছে...'; }
+                });
+            }
+        })();
         </script>
         <script>
             // ========== GTM — view_item_list (সব প্রোডাক্ট) ==========

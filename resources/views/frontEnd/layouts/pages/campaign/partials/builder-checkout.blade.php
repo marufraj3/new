@@ -40,7 +40,15 @@
                     <tbody>
                     @foreach(Cart::instance('shopping')->content() as $item)
                         <tr>
-                            <td class="text-start"><img src="{{ asset($item->options->image ?? 'public/uploads/default.webp') }}" width="42" height="42" alt=""> <strong>{{ Str::limit($item->name, 24) }}</strong></td>
+                            <td class="text-start">
+                                <img src="{{ asset($item->options->image ?? 'public/uploads/default.webp') }}" width="42" height="42" alt=""> <strong>{{ Str::limit($item->name, 24) }}</strong>
+                                @if(!empty($item->options->product_size) || !empty($item->options->product_color))
+                                    <small class="d-block text-muted">
+                                        @if(!empty($item->options->product_size)) Size: {{ $item->options->product_size }} @endif
+                                        @if(!empty($item->options->product_color)) | Color: {{ $item->options->product_color }} @endif
+                                    </small>
+                                @endif
+                            </td>
                             <td><div class="quantity"><button type="button" class="cart_decrement" data-id="{{ $item->rowId }}">−</button><input type="text" value="{{ $item->qty }}" readonly><button type="button" class="cart_increment" data-id="{{ $item->rowId }}">+</button></div></td>
                             <td>৳{{ number_format($item->price * $item->qty, 0) }}</td>
                         </tr>

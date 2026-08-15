@@ -247,8 +247,15 @@
                     <td class="fw-bold text-dark">৳{{ number_format($value->new_price, 2) }}</td>
 
                     <td>
-                        @if($value->stock > 0)
-                            <span class="text-dark fw-medium">{{ $value->stock }}</span>
+                        @php
+                            $variantRows = $value->variantPrices ?? collect();
+                            $hasVariantStock = $variantRows->contains(fn($v) => $v->stock !== null);
+                            $totalStock = $hasVariantStock
+                                ? $variantRows->sum(fn($v) => max(0, (int) $v->stock))
+                                : (int) ($value->stock ?? 0);
+                        @endphp
+                        @if($totalStock > 0)
+                            <span class="text-dark fw-medium">{{ $totalStock }}</span>
                         @else
                             <span class="text-danger fw-bold">Out of Stock</span>
                         @endif
