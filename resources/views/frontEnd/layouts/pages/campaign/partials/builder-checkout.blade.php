@@ -1,6 +1,9 @@
 @php
     $builderSubtotal = (float) str_replace([',', '.00'], '', Cart::instance('shopping')->subtotal());
     $builderShipping = (float) Session::get('shipping', 0);
+    $builderDiscount = (float) Session::get('discount', 0);
+    $builderCoupon   = Session::get('coupon_code');
+    $builderBumps    = $orderBumps ?? collect();
 @endphp
 <div class="cpb-live-checkout">
     @if($products->count() > 1)
@@ -57,10 +60,68 @@
                     <tfoot>
                         <tr><th colspan="2" class="text-end">মোট</th><td id="net_total"><strong>{{ number_format($builderSubtotal, 0) }}</strong></td></tr>
                         <tr><th colspan="2" class="text-end">ডেলিভারি চার্জ</th><td id="cart_shipping_cost"><strong>{{ number_format($builderShipping, 0) }}</strong></td></tr>
-                        <tr><th colspan="2" class="text-end">সর্বমোট</th><td id="grand_total"><strong>{{ number_format($builderSubtotal + $builderShipping, 0) }}</strong></td></tr>
+                        @if($builderDiscount > 0)
+                            <tr><th colspan="2" class="text-end">কুপন ছাড়</th><td id="cart_discount"><strong>−{{ number_format($builderDiscount, 0) }}</strong></td></tr>
+                        @endif
+                        <tr><th colspan="2" class="text-end">সর্বমোট</th><td id="grand_total"><strong>{{ number_format($builderSubtotal + $builderShipping - $builderDiscount, 0) }}</strong></td></tr>
                     </tfoot>
                 </table>
             </div>
+
+            {{-- ===== অর্ডার বাম্প — এক ক্লিকে অ্যাড-অন অফার ===== --}}
+            @if($builderBumps->isNotEmpty())
+                <div class="cpb-bumps" data-cpb-bumps data-bump-url="{{ route('cart.addBump') }}">
+                    @foreach($builderBumps as $bump)
+                        <div class="cpb-bump" data-cpb-bump="{{ $bump->id }}"
+                             data-bump-product-id="{{ $bump->product_id }}"
+                             data-bump-product-name="{{ $bump->product->name }}"
+                             data-bump-price="{{ $bump->offerPrice() }}">
+                            <label class="cpb-bump-check">
+                                <input type="checkbox" data-cpb-bump-toggle="{{ $bump->id }}">
+                                <span class="cpb-bump-box" aria-hidden="true"></span>
+                                <span class="cpb-bump-body">
+                                    <strong>{{ $bump->title ?: 'এই অফারটিও যোগ করুন' }}</strong>
+                                    @if($bump->subtitle)
+                                        <small>{{ $bump->subtitle }}</small>
+                                    @endif
+                                    <span class="cpb-bump-product">
+                                        <img src="{{ asset(optional($bump->product->image)->image ?? 'public/uploads/default.webp') }}" width="44" height="44" alt="" loading="lazy">
+                                        <span>
+                                            <span class="cpb-bump-name">{{ Str::limit($bump->product->name, 40) }}</span>
+                                            <span class="cpb-bump-price">
+                                                <b>৳{{ number_format($bump->offerPrice(), 0) }}</b>
+                                                @if($bump->savings() > 0)
+                                                    <del>৳{{ number_format((float) ($bump->product->new_price ?? 0), 0) }}</del>
+                                                    <em>৳{{ number_format($bump->savings(), 0) }} সাশ্রয়</em>
+                                                @endif
+                                            </span>
+                                        </span>
+                                    </span>
+                                </span>
+                            </label>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+
+            {{-- ===== কুপন কোড ===== --}}
+            <div class="cpb-coupon" data-cpb-coupon
+                 data-apply-url="{{ route('coupon.apply') }}"
+                 data-remove-url="{{ route('coupon.remove') }}">
+                @if($builderCoupon)
+                    <div class="cpb-coupon-applied" data-cpb-coupon-applied>
+                        <span>✓ কুপন <b>{{ $builderCoupon }}</b> প্রয়োগ হয়েছে</span>
+                        <button type="button" data-cpb-coupon-remove>বাতিল</button>
+                    </div>
+                @else
+                    <div class="cpb-coupon-form">
+                        <input type="text" id="cpb-coupon-code" placeholder="কুপন কোড থাকলে লিখুন" autocomplete="off" aria-label="কুপন কোড">
+                        <button type="button" data-cpb-coupon-apply>প্রয়োগ</button>
+                    </div>
+                @endif
+                <p class="cpb-coupon-msg" data-cpb-coupon-msg role="status" aria-live="polite" hidden></p>
+            </div>
+
             <div class="cpb-checkout-assurance"><span>🔒 নিরাপদ অর্ডার</span><span>✓ ক্যাশ অন ডেলিভারি</span></div>
         </section>
 

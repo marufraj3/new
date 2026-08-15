@@ -190,3 +190,53 @@ body.cpb-store-busy { overflow: hidden; }
     .cpb-design-toggle { left: 12px; bottom: 12px; min-height: 36px; padding: 8px 12px; font-size: 11px; }
     #cpb-plain-view { padding: 16px 10px 90px; }
 }
+
+/* ============================================================
+   Order bump — চেকআউটে এক-ক্লিক অ্যাড-অন অফার
+   ============================================================ */
+.cpb-bumps { display: grid; margin-top: 14px; gap: 10px; }
+.cpb-bump { border: 2px dashed #f59e0b; border-radius: 12px; background: #fffbeb; transition: .2s; }
+.cpb-bump:hover { border-color: #d97706; background: #fef3c7; }
+.cpb-bump.is-added { border-style: solid; border-color: #16a34a; background: #f0fdf4; }
+.cpb-bump-check { display: flex; padding: 13px; align-items: flex-start; gap: 11px; cursor: pointer; }
+.cpb-bump.is-added .cpb-bump-check { cursor: default; }
+.cpb-bump-check input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.cpb-bump-box { flex: 0 0 auto; width: 22px; height: 22px; margin-top: 2px; border: 2px solid #d97706; border-radius: 6px; background: #fff; transition: .18s; }
+.cpb-bump-check input:checked + .cpb-bump-box { border-color: #16a34a; background: #16a34a url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8.5l3.5 3.5L13 5'/%3E%3C/svg%3E") center/14px no-repeat; }
+.cpb-bump-check input:focus-visible + .cpb-bump-box { outline: 2px solid #0f172a; outline-offset: 2px; }
+.cpb-bump-body { display: block; flex: 1; min-width: 0; }
+.cpb-bump-body > strong { display: block; color: #92400e; font-size: 13.5px; font-weight: 800; }
+.cpb-bump.is-added .cpb-bump-body > strong { color: #15803d; }
+.cpb-bump-body > small { display: block; margin-top: 2px; color: #a16207; font-size: 11.5px; }
+.cpb-bump-product { display: flex; margin-top: 9px; padding-top: 9px; border-top: 1px solid rgba(217, 119, 6, .22); align-items: center; gap: 9px; }
+.cpb-bump-product img { flex: 0 0 auto; width: 44px; height: 44px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; object-fit: cover; }
+.cpb-bump-name { display: block; color: #0f172a; font-size: 12.5px; font-weight: 700; }
+.cpb-bump-price { display: flex; margin-top: 3px; align-items: center; flex-wrap: wrap; gap: 7px; }
+.cpb-bump-price b { color: #15803d; font-size: 15px; font-weight: 800; }
+.cpb-bump-price del { color: #94a3b8; font-size: 12px; }
+.cpb-bump-price em { padding: 2px 8px; border-radius: 20px; color: #b45309; background: #fde68a; font-size: 10.5px; font-style: normal; font-weight: 800; }
+
+/* ============================================================
+   Coupon — ক্যাম্পেইন চেকআউটের AJAX কুপন ফিল্ড
+   ============================================================ */
+.cpb-coupon { margin-top: 14px; }
+.cpb-coupon-form { display: flex; gap: 8px; }
+.cpb-coupon-form input { flex: 1; min-width: 0; padding: 11px 13px; border: 1.5px solid #dbe1ea; border-radius: 10px; outline: 0; font-size: 13.5px; transition: .18s; }
+.cpb-coupon-form input:focus { border-color: #16a34a; box-shadow: 0 0 0 3px rgba(22, 163, 74, .12); }
+.cpb-coupon-form button { flex: 0 0 auto; padding: 11px 20px; border: 0; border-radius: 10px; color: #fff; background: #0f172a; font-size: 13px; font-weight: 800; cursor: pointer; transition: .18s; }
+.cpb-coupon-form button:hover { background: #16a34a; }
+.cpb-coupon-form button:disabled { opacity: .6; cursor: not-allowed; }
+.cpb-coupon-applied { display: flex; padding: 11px 13px; border: 1px solid #bbf7d0; border-radius: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; color: #14532d; background: #f0fdf4; font-size: 13px; font-weight: 700; }
+.cpb-coupon-applied b { letter-spacing: .5px; }
+.cpb-coupon-applied button { padding: 6px 12px; border: 1px solid #dc2626; border-radius: 8px; color: #dc2626; background: #fff; font-size: 11.5px; font-weight: 800; cursor: pointer; }
+.cpb-coupon-applied button:hover { color: #fff; background: #dc2626; }
+.cpb-coupon-applied button:disabled { opacity: .6; cursor: not-allowed; }
+.cpb-coupon-msg { margin: 7px 0 0; font-size: 12px; font-weight: 700; }
+.cpb-coupon-msg.is-error { color: #b91c1c; }
+.cpb-coupon-msg.is-success { color: #15803d; }
+.cpb-coupon-msg[hidden] { display: none !important; }
+
+@media (max-width: 480px) {
+    .cpb-coupon-form { flex-wrap: wrap; }
+    .cpb-coupon-form input, .cpb-coupon-form button { width: 100%; }
+}

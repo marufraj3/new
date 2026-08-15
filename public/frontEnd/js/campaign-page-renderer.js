@@ -53,7 +53,7 @@
         if (selectedArea && selectedArea.selectedIndex > 0) updateShipping(selectedArea.value);
 
         const stickyButton = document.getElementById('cpb-sticky-order');
-        stickyButton.hidden = checkoutTargets.length === 0;
+        if (stickyButton) stickyButton.hidden = checkoutTargets.length === 0;
         if (checkoutTargets.length && root.querySelector('.cpb-form-errors')) {
             setTimeout(() => checkoutTargets[0].scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
         }
@@ -430,11 +430,12 @@
 
     function setBusy(value) {
         requestInProgress = value;
-        loading.hidden = !value;
+        if (loading) loading.hidden = !value;
         document.body.classList.toggle('cpb-store-busy', value);
     }
 
     function showToast(message, isSuccess) {
+        if (!toastElement) return;
         window.clearTimeout(toastTimer);
         toastElement.textContent = message;
         toastElement.style.background = isSuccess ? '#12a150' : '#b91c1c';
@@ -566,7 +567,7 @@
             if (submit) { submit.disabled = true; submit.querySelector('span').textContent = 'অর্ডার প্রসেস হচ্ছে...'; }
         });
 
-        document.getElementById('cpb-sticky-order').addEventListener('click', () => {
+        document.getElementById('cpb-sticky-order')?.addEventListener('click', () => {
             trackOrderClick();
             root.querySelector('#order_form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
@@ -760,6 +761,202 @@
         });
     }
 
+    /* ============================================================
+       Coupon + Order bump (কনভার্সন)
+       ক্যাম্পেইন পেজ কখনো রিলোড হয় না, তাই দুটোই fetch() দিয়ে চলে এবং
+       সার্ভার রিফ্রেশ করা কার্ট HTML ফেরত পাঠায়।
+       ============================================================ */
+    function csrf() {
+        return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    }
+
+    /**
+     * কুপন/বাম্প — দুটোরই POST একই আকৃতির JSON ফেরত দেয়:
+     * { ok, message, cart_html }
+     */
+    async function postConversionAction(url, body) {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-Campaign-Page': '1',
+                'X-CSRF-TOKEN': csrf()
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify(body || {})
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (typeof data.cart_html === 'string') replaceCart(data.cart_html);
+
+        return { ok: response.ok && data.ok !== false, message: data.message || '' };
+    }
+
+    function initCoupon() {
+        const wrapper = root.querySelector('[data-cpb-coupon]');
+        if (!wrapper) return;
+
+        const message = wrapper.querySelector('[data-cpb-coupon-msg]');
+
+        function say(text, isSuccess) {
+            if (!message) return;
+            message.textContent = text;
+            message.hidden = !text;
+            message.classList.toggle('is-error', !isSuccess);
+            message.classList.toggle('is-success', !!isSuccess);
+        }
+
+        wrapper.addEventListener('click', async event => {
+            const applyButton = event.target.closest('[data-cpb-coupon-apply]');
+            const removeButton = event.target.closest('[data-cpb-coupon-remove]');
+            if (!applyButton && !removeButton) return;
+
+            event.preventDefault();
+            if (requestInProgress) return;
+
+            const button = applyButton || removeButton;
+            button.disabled = true;
+            setBusy(true);
+
+            try {
+                let result;
+
+                if (applyButton) {
+                    const input = wrapper.querySelector('#cpb-coupon-code');
+                    const code = (input?.value || '').trim();
+
+                    if (!code) {
+                        say('কুপন কোডটি লিখুন।', false);
+                        return;
+                    }
+
+                    result = await postConversionAction(wrapper.dataset.applyUrl, { coupon_code: code });
+
+                    if (result.ok) {
+                        /* সফল হলে ইনপুটের জায়গায় "প্রয়োগ হয়েছে" ব্যাজ বসাই */
+                        const form = wrapper.querySelector('.cpb-coupon-form');
+                        if (form) {
+                            const applied = document.createElement('div');
+                            applied.className = 'cpb-coupon-applied';
+                            applied.setAttribute('data-cpb-coupon-applied', '');
+                            applied.innerHTML = '<span>✓ কুপন <b>' + escapeHtml(code.toUpperCase()) + '</b> প্রয়োগ হয়েছে</span>'
+                                + '<button type="button" data-cpb-coupon-remove>বাতিল</button>';
+                            form.replaceWith(applied);
+                        }
+                    }
+                } else {
+                    result = await postConversionAction(wrapper.dataset.removeUrl, {});
+
+                    if (result.ok) {
+                        const applied = wrapper.querySelector('[data-cpb-coupon-applied]');
+                        if (applied) {
+                            const form = document.createElement('div');
+                            form.className = 'cpb-coupon-form';
+                            form.innerHTML = '<input type="text" id="cpb-coupon-code" placeholder="কুপন কোড থাকলে লিখুন" autocomplete="off" aria-label="কুপন কোড">'
+                                + '<button type="button" data-cpb-coupon-apply>প্রয়োগ</button>';
+                            applied.replaceWith(form);
+                        }
+                    }
+                }
+
+                say(result.message, result.ok);
+            } catch (error) {
+                say('কুপন যাচাই করা যায়নি, আবার চেষ্টা করুন।', false);
+            } finally {
+                button.disabled = false;
+                setBusy(false);
+            }
+        });
+    }
+
+    /**
+     * বাম্প প্রোডাক্ট window._campaignProducts এ থাকে না (সেটা ক্যাম্পেইনের
+     * নিজস্ব প্রোডাক্ট তালিকা), তাই ট্র্যাকিং ডেটা DOM থেকেই নিই।
+     */
+    function trackBumpAddToCart(card) {
+        if (!card) return;
+
+        const item = {
+            item_id: String(card.dataset.bumpProductId || ''),
+            item_name: card.dataset.bumpProductName || '',
+            price: Number(card.dataset.bumpPrice || 0),
+            quantity: 1
+        };
+
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({ ecommerce: null });
+        window.dataLayer.push({ event: 'add_to_cart', ecommerce: { currency: 'BDT', value: item.price, items: [item] } });
+
+        if (typeof window.fbq === 'function') {
+            window.fbq('track', 'AddToCart', {
+                content_ids: [item.item_id],
+                content_name: item.item_name,
+                content_type: 'product',
+                value: item.price,
+                currency: 'BDT'
+            }, { eventID: 'atc_bump_' + item.item_id + '_' + Math.floor(Date.now() / 1000) });
+        }
+
+        if (typeof window.ttq !== 'undefined' && typeof window.ttq.track === 'function') {
+            window.ttq.track('AddToCart', {
+                content_id: item.item_id,
+                content_name: item.item_name,
+                content_type: 'product',
+                value: item.price,
+                currency: 'BDT',
+                quantity: 1
+            });
+        }
+    }
+
+    function initOrderBumps() {
+        const wrapper = root.querySelector('[data-cpb-bumps]');
+        if (!wrapper) return;
+
+        wrapper.addEventListener('change', async event => {
+            const toggle = event.target.closest('[data-cpb-bump-toggle]');
+            if (!toggle || !toggle.checked) return;
+
+            /* একবার যোগ হয়ে গেলে আর দ্বিতীয়বার পাঠাবো না */
+            if (toggle.closest('[data-cpb-bump]')?.classList.contains('is-added')) return;
+
+            if (requestInProgress) {
+                toggle.checked = false;
+                return;
+            }
+
+            const bumpId = toggle.dataset.cpbBumpToggle;
+            const card = toggle.closest('[data-cpb-bump]');
+            toggle.disabled = true;
+            setBusy(true);
+
+            try {
+                const result = await postConversionAction(wrapper.dataset.bumpUrl, { bump_id: bumpId });
+
+                if (result.ok) {
+                    /* একবার যোগ হলে আর খোলা যাবে না — সরানোর কাজটা কার্ট টেবিল করে */
+                    card?.classList.add('is-added');
+                    showToast(result.message || 'অফারটি যোগ হয়েছে!', true);
+
+                    /* বাম্প id নয়, আসল প্রোডাক্ট id দিয়েই AddToCart ট্র্যাক করি */
+                    trackBumpAddToCart(card);
+                } else {
+                    toggle.checked = false;
+                    toggle.disabled = false;
+                    showToast(result.message || 'অফারটি যোগ করা যায়নি।');
+                }
+            } catch (error) {
+                toggle.checked = false;
+                toggle.disabled = false;
+                showToast('অফারটি যোগ করা যায়নি, আবার চেষ্টা করুন।');
+            } finally {
+                setBusy(false);
+            }
+        });
+    }
+
     function initAnalytics() {
         window.dataLayer = window.dataLayer || [];
         window.dataLayer.push({ ecommerce: null });
@@ -773,5 +970,7 @@
     bindEvents();
     initDesignToggle();
     initAbandonedCart();
+    initCoupon();
+    initOrderBumps();
     initAnalytics();
 })();

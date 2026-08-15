@@ -1275,12 +1275,21 @@ $brands = Brand::where('status', 1)
             }
         })->afterResponse();
 
+        // ⭐ অর্ডার বাম্প — চেকআউটে দেখানোর মতো অ্যাড-অন অফার (AOV বাড়ানোর জন্য)
+        $orderBumps = app(\App\Services\OrderBumpService::class)
+            ->availableFor($campaign_data->id);
+
+        if ($orderBumps->isNotEmpty()) {
+            app(\App\Services\OrderBumpService::class)->recordImpressions($orderBumps);
+        }
+
         $viewData = compact(
             'campaign_data',
             'products',
             'shippingcharge',
             'tiktok_pixels',
-            'fb_view_content_event_id'
+            'fb_view_content_event_id',
+            'orderBumps'
         );
 
         // Page builder দিয়ে ডিজাইন করা থাকলে আলাদা ভিউ

@@ -354,8 +354,10 @@ Route::delete('/admin/complaints/{id}', [AdminComplaintController::class, 'destr
     ->middleware(['auth:admin', 'admin', 'demo_mode'])->name('backEnd.complaints.destroy');
 
 
-Route::post('cart/apply-coupon', [ShoppingController::class, 'applyCoupon'])->name('coupon.apply');
-Route::get('cart/remove-coupon', [ShoppingController::class, 'removeCoupon'])->name('coupon.remove');
+Route::post('cart/apply-coupon', [ShoppingController::class, 'applyCoupon'])
+    ->middleware('throttle:30,1')
+    ->name('coupon.apply');
+Route::match(['get', 'post'], 'cart/remove-coupon', [ShoppingController::class, 'removeCoupon'])->name('coupon.remove');
 Route::prefix('admin')->middleware(['auth:admin', 'admin', 'demo_mode'])->group(function () {
     // Fund Routes
     Route::get('/fund', [FundController::class, 'index'])->name('admin.fund.index');
@@ -508,6 +510,11 @@ Route::post('/cart/store', [FrontendController::class, 'cartStore'])->name('cart
     Route::get('/cart/change-product', [ShoppingController::class, 'changeProduct'])->name('cart.changeProduct');
     Route::get('cart/update', [ShoppingController::class, 'cart_update'])->name('cart.update');
 
+    // ⭐ অর্ডার বাম্প — চেকআউট থেকে এক ক্লিকে অফার প্রোডাক্ট কার্টে যোগ
+    Route::post('cart/add-bump', [ShoppingController::class, 'addOrderBump'])
+        ->middleware('throttle:30,1')
+        ->name('cart.addBump');
+
 
 });
 
@@ -603,6 +610,15 @@ Route::match(['put', 'post'], 'coupon/update/{id}', [CouponController::class, 'u
 
 Route::delete('coupon/destroy/{id}', [CouponController::class, 'destroy'])
      ->name('admin.coupons.destroy');
+
+// 🟢 Order Bump Management (চেকআউট অ্যাড-অন অফার)
+Route::get('order-bump/manage', [\App\Http\Controllers\Admin\OrderBumpController::class, 'index'])->name('admin.order_bumps.index');
+Route::get('order-bump/create', [\App\Http\Controllers\Admin\OrderBumpController::class, 'create'])->name('admin.order_bumps.create');
+Route::post('order-bump/save', [\App\Http\Controllers\Admin\OrderBumpController::class, 'store'])->name('admin.order_bumps.store');
+Route::get('order-bump/{id}/edit', [\App\Http\Controllers\Admin\OrderBumpController::class, 'edit'])->name('admin.order_bumps.edit');
+Route::match(['put', 'post'], 'order-bump/update/{id}', [\App\Http\Controllers\Admin\OrderBumpController::class, 'update'])->name('admin.order_bumps.update');
+Route::post('order-bump/{id}/toggle', [\App\Http\Controllers\Admin\OrderBumpController::class, 'toggle'])->name('admin.order_bumps.toggle');
+Route::delete('order-bump/destroy/{id}', [\App\Http\Controllers\Admin\OrderBumpController::class, 'destroy'])->name('admin.order_bumps.destroy');
 
 // লাইসেন্স ইনফরমেশন দেখার রাউট
 Route::get('license-info', [App\Http\Controllers\Admin\LicenseController::class, 'licenseInfo'])->name('admin.license.info');
