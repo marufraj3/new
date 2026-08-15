@@ -22,6 +22,7 @@ use App\Models\Contact;
 use App\Models\GeneralSetting;
 use App\Models\IncompleteOrder;
 use App\Models\Product;          // স্টক কমানোর জন্য
+use App\Models\ProductVariantPrice;
 use App\Models\DigitalDownload;  // ⭐ ডিজিটাল ডাউনলোড মডেল
 
 use Session;
@@ -949,7 +950,16 @@ public function order_save(Request $request)
             ->get();
 
         foreach ($details as $row) {
-            if ($row->product) {
+            $variant = $row->variant_price_id
+                ? ProductVariantPrice::find($row->variant_price_id)
+                : ProductVariantPrice::where('product_id', $row->product_id)
+                    ->when($row->product_size, fn($q) => $q->where('size_id', $row->product_size))
+                    ->when($row->product_color, fn($q) => $q->where('color_id', $row->product_color))
+                    ->first();
+            if ($variant && $variant->stock !== null) {
+                $variant->stock = max(0, (int) $variant->stock - (int) $row->qty);
+                $variant->save();
+            } elseif ($row->product) {
                 $row->product->stock = max(0, $row->product->stock - $row->qty);
                 $row->product->save();
             }
