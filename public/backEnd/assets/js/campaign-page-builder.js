@@ -957,7 +957,17 @@
 
     function bindEvents() {
         document.getElementById('cpb-save').addEventListener('click', () => savePage());
-        document.getElementById('cpb-preview').addEventListener('click', () => savePage({ preview: true }));
+        document.getElementById('cpb-preview').addEventListener('click', () => {
+            if (!model.sections.length) {
+                model = templateModel('direct');
+                selected = null;
+                renderCanvas();
+                renderInspector();
+                markDirty(false);
+                commitHistory();
+            }
+            savePage({ preview: true });
+        });
         document.getElementById('cpb-templates').addEventListener('click', openTemplates);
         document.getElementById('cpb-quick-templates').addEventListener('click', openTemplates);
         document.getElementById('cpb-open-css').addEventListener('click', openCss);

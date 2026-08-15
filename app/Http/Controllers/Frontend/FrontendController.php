@@ -68,7 +68,7 @@ class FrontendController extends Controller
     public function index()
     {
         // ✅ Homepage cache (5 min) - reduces DB load on high traffic
-        $cacheKey = 'frontend_homepage_v1';
+        $cacheKey = 'frontend_homepage_v2';
         $cacheMinutes = 5;
         $data = Cache::remember($cacheKey, $cacheMinutes * 60, function () {
             return $this->getHomepageData();
@@ -143,24 +143,26 @@ $brands = Brand::where('status', 1)
             ->get();
 
         // Flash sale – image + reviews eager load
+        $productCardRelations = ['prosizes', 'procolors', 'image', 'reviews', 'variantPrices.color', 'variantPrices.size'];
+
         $flas_sales = Product::where(['status' => 1, 'approval_status' => 'approved', 'flashsale' => 1])
             ->orderBy('id', 'DESC')
             ->select('id', 'name', 'slug', 'new_price', 'old_price', 'sold', 'stock')
-            ->with(['prosizes', 'procolors', 'image', 'reviews'])
+            ->with($productCardRelations)
             ->limit(12)
             ->get();
 
-        // Hot deal top – image + reviews eager load
+        // Hot deal top – image + reviews + variant stock/price
         $hotdeal_top = Product::where(['status' => 1, 'approval_status' => 'approved', 'topsale' => 1])
             ->orderBy('id', 'DESC')
             ->select('id', 'name', 'slug', 'new_price', 'old_price', 'stock')
-            ->with(['prosizes', 'procolors', 'image', 'reviews'])
+            ->with($productCardRelations)
             ->limit(12)
             ->get();
 
         $hotdeal_bottom = Product::where(['status' => 1, 'approval_status' => 'approved', 'topsale' => 1])
             ->select('id', 'name', 'slug', 'new_price', 'old_price', 'stock')
-            ->with('image')
+            ->with($productCardRelations)
             ->skip(12)
             ->limit(12)
             ->get();
@@ -387,9 +389,7 @@ $brands = Brand::where('status', 1)
         if ($variantPrice && $variantPrice->price > 0) {
             $finalPrice = $variantPrice->price;
         } elseif (!empty($product->new_price) && $product->new_price > 0) {
-            $finalPrice = $product->new_price;
-        } elseif (!empty($product->old_price) && $product->old_price > 0) {
-            $finalPrice = $product->old_price;
+            $finalPrice = $product->new_prie = $product->old_price;
         } else {
             $finalPrice = 1; // fallback price
         }
@@ -1061,7 +1061,7 @@ $brands = Brand::where('status', 1)
                 Session::put('shipping_id', $shipping->id);
             }
         }
-        return view('frontEnd.layouts.ajax.cart');
+        return view(\App\Http\Controllers\Frontend\ShoppingController::cartPartial());
     }
 
     public function contact()
@@ -1147,7 +1147,9 @@ $brands = Brand::where('status', 1)
             ->orderBy('products.id')
             ->get();
 
-        abort_if($products->isEmpty(), 404, 'No available product is assigned to this campaign.');
+        if ($products->isEmpty()) {
+            $products = collect();
+        }
 
         // A campaign is a single-product checkout flow. Start it with the deterministic
         // primary/first available product and safely handle products without an image.
@@ -1355,5 +1357,8 @@ $brands = Brand::where('status', 1)
         $categories = Category::where('status', 1)->where('parent_id', 0)->get();
 
         return view('frontEnd.layouts.pages.wholesale_products', compact('products', 'categories'));
+    }
+}
+.wholesale_products', compact('products', 'categories'));
     }
 }

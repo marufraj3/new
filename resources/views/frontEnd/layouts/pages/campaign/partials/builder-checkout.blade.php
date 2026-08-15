@@ -85,7 +85,7 @@
                 <div class="cpb-form-field">
                     <label for="cpb-area">ডেলিভারি এরিয়া <span>*</span></label>
                     <select id="cpb-area" name="area" required>
-                        @foreach($shippingcharge as $charge)
+                        @foreach(($shippingcharge ?? collect()) as $charge)
                             <option value="{{ $charge->id }}" {{ (string) old('area') === (string) $charge->id ? 'selected' : '' }}>{{ $charge->name }} — ৳{{ number_format((float) $charge->amount, 0) }}</option>
                         @endforeach
                     </select>

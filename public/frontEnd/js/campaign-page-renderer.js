@@ -200,8 +200,9 @@
 
     async function requestHtml(url, params) {
         const requestUrl = new URL(url, window.location.origin);
+        requestUrl.searchParams.set('campaign', '1');
         Object.entries(params || {}).forEach(([key, value]) => requestUrl.searchParams.set(key, value));
-        const response = await fetch(requestUrl.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' }, credentials: 'same-origin' });
+        const response = await fetch(requestUrl.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html', 'X-Campaign-Page': '1' }, credentials: 'same-origin' });
         const contentType = response.headers.get('content-type') || '';
         if (!response.ok) {
             if (contentType.includes('application/json')) {

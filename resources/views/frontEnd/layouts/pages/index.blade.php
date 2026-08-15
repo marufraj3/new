@@ -426,6 +426,18 @@
 .cd-top.on{opacity:1;pointer-events:auto;}
 
 /* ============ RESPONSIVE ============ */
+.cd-hero.is-solo{grid-template-columns:1fr;}
+.cd-blogs{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;}
+.cd-blog{background:#fff;border:1px solid var(--cd-line);border-radius:var(--cd-radius);overflow:hidden;display:flex;flex-direction:column;transition:.25s;}
+.cd-blog:hover{transform:translateY(-5px);box-shadow:var(--cd-shadow-lg);}
+.cd-blog img{width:100%;aspect-ratio:16/10;object-fit:cover;}
+.cd-blog-body{padding:12px 14px 16px;display:flex;flex-direction:column;gap:8px;flex:1;}
+.cd-blog-body h3{margin:0;font-size:16px;font-weight:700;line-height:1.35;}
+.cd-blog-body p{margin:0;font-size:13px;color:var(--cd-muted);line-height:1.5;}
+.cd-blog-meta{font-size:12px;color:var(--cd-muted);}
+.cd-reviews{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;}
+.cd-reviews a{border-radius:var(--cd-radius);overflow:hidden;box-shadow:var(--cd-shadow);display:block;}
+.cd-reviews img{width:100%;height:100%;object-fit:cover;}
 @media(max-width:1100px){
     .cd-hero{grid-template-columns:minmax(0,1fr) minmax(0,340px);}
 }
@@ -480,27 +492,18 @@
         </div>
 
         @php
-            $cdSideBanners = [
-                [
-                    'image' => 'https://ecommerce4.creativedesign.com.bd/public/uploads/banner/1783342266-6a4ba4ba14809-captan-fashion-banner-fa8ebb88ff.webp',
-                    'link'  => url('#'),
-                    'alt'   => 'Polo T-Shirt Collection',
-                ],
-                [
-                    'image' => 'https://ecommerce4.creativedesign.com.bd/public/uploads/banner/1783342291-6a4ba4d356321-website-banner-71c5d21967.webp',
-                    'link'  => url('/'),
-                    'alt'   => 'Premium Quality Tracksuit',
-                ],
-            ];
+            $cdSideBanners = collect($sliderbottomads ?? [])->take(2);
         @endphp
 
+        @if($cdSideBanners->count())
         <div class="cd-hero-side">
             @foreach($cdSideBanners as $sb)
-            <a href="{{ $sb['link'] }}">
-                <img src="{{ asset($sb['image']) }}" alt="{{ $sb['alt'] }}" loading="lazy">
+            <a href="{{ $sb->link ?: '#' }}">
+                <img src="{{ asset($sb->image) }}" alt="Promo banner" loading="lazy">
             </a>
             @endforeach
         </div>
+        @endif
 
     </div>
 </div>
@@ -524,6 +527,27 @@
 </div></section>
 @endif
 
+{{-- ---------- হিরো-নিচের অতিরিক্ত ব্যানার + হোমপেজ অ্যাড ---------- --}}
+@php
+    $cdExtraBottomAds = collect($sliderbottomads ?? [])->skip(2)->values();
+@endphp
+@if($cdExtraBottomAds->count())
+<section class="cd-sec"><div class="cd-wrap">
+    <div class="cd-ads cd-ads-{{ min(4, $cdExtraBottomAds->count()) }}">
+        @foreach($cdExtraBottomAds as $ad)
+        <a href="{{ $ad->link ?: '#' }}"><img src="{{ asset($ad->image) }}" alt="Promo banner" loading="lazy"></a>
+        @endforeach
+    </div>
+</div></section>
+@endif
+
+@if(isset($homepageads) && $homepageads->count())
+<section class="cd-sec"><div class="cd-wrap"><div class="cd-ad-full">
+    @foreach($homepageads as $ad)
+    <a href="{{ $ad->link ?: '#' }}"><img src="{{ asset($ad->image) }}" alt="Homepage banner" loading="lazy"></a>
+    @endforeach
+</div></div></section>
+@endif
 
 {{-- ============================================================
      PART 7 : FLASH SALE (কাউন্টডাউন + প্রোডাক্ট)
@@ -658,6 +682,15 @@
         @endforeach
     </div>
 </div></section>
+@endif
+
+{{-- ---------- দ্বিতীয় হোমপেজ অ্যাড ---------- --}}
+@if(isset($homepageads2) && $homepageads2->count())
+<section class="cd-sec"><div class="cd-wrap"><div class="cd-ad-full">
+    @foreach($homepageads2 as $ad)
+    <a href="{{ $ad->link ?: '#' }}"><img src="{{ asset($ad->image) }}" alt="Homepage banner" loading="lazy"></a>
+    @endforeach
+</div></div></section>
 @endif
 
 {{-- ============================================================
@@ -1079,6 +1112,35 @@
         var t = document.createElement('div');
         t.textContent = msg;
         t.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:' + (err ? '#e11d48' : '#12a150') + ';color:#fff;padding:11px 22px;border-radius:30px;z-index:100000;font-size:13.5px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.2)';
+        document.body.appendChild(t);
+        setTimeout(function(){ t.remove(); }, 2300);
+    }
+
+    /* ---------- ৬. লাইভ পারচেজ নোটিফিকেশন ---------- */
+    var liveData = Object.keys(CDP).slice(0,10).map(function(k){ return { n: CDP[k].name.substring(0,34), i: CDP[k].img }; });
+    var cities = ['ঢাকা','চট্টগ্রাম','সিলেট','খুলনা','রাজশাহী','বরিশাল','রংপুর','ময়মনসিংহ','কুমিল্লা','নারায়ণগঞ্জ'];
+    var live = document.getElementById('cdLive');
+    if(liveData.length){
+        setInterval(function(){
+            var d = liveData[Math.floor(Math.random() * liveData.length)];
+            document.getElementById('cdLiveImg').src   = d.i;
+            document.getElementById('cdLiveName').textContent = d.n;
+            document.getElementById('cdLiveCity').textContent = cities[Math.floor(Math.random() * cities.length)];
+            live.classList.add('on');
+            setTimeout(function(){ live.classList.remove('on'); }, 5000);
+        }, 14000);
+    }
+
+    /* ---------- ৭. ব্যাক টু টপ ---------- */
+    var topBtn = document.getElementById('cdTop');
+    window.addEventListener('scroll', function(){
+        topBtn.classList.toggle('on', window.scrollY > 500);
+    }, {passive:true});
+
+})();
+</script>
+@endsection
+;z-index:100000;font-size:13.5px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.2)';
         document.body.appendChild(t);
         setTimeout(function(){ t.remove(); }, 2300);
     }

@@ -1,375 +1,139 @@
 @extends('backEnd.layouts.master')
-@section('title','Landing Page Create')
+@section('title','Create Landing Page')
 @section('css')
 <link href="{{asset('public/backEnd')}}/assets/libs/summernote/summernote-lite.min.css" rel="stylesheet" type="text/css" />
-
 <link href="{{asset('public/backEnd')}}/assets/libs/select2/css/select2.min.css" rel="stylesheet" type="text/css" />
 <link href="{{asset('public/backEnd')}}/assets/libs/flatpickr/flatpickr.min.css" rel="stylesheet" type="text/css" />
+<style>
+    .lp-setup { max-width: 1180px; margin: 0 auto; }
+    .lp-hero { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:22px; }
+    .lp-kicker { display:inline-flex; margin-bottom:6px; padding:4px 10px; border-radius:999px; background:#f3e8ff; color:#6d28d9; font-size:11px; font-weight:800; letter-spacing:.4px; }
+    .lp-hero h4 { margin:0; font-weight:800; color:#172033; }
+    .lp-hero p { margin:6px 0 0; color:#6b7280; font-size:13px; }
+    .lp-grid { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(280px,.8fr); gap:20px; }
+    .lp-card { border:0; border-radius:16px; box-shadow:0 12px 32px rgba(23,32,51,.06); overflow:hidden; }
+    .lp-card .card-body { padding:22px; }
+    .lp-section-title { margin-bottom:16px; font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:.6px; color:#6d28d9; }
+    .lp-help { display:block; margin-top:6px; color:#8b95a5; font-size:12px; }
+    .lp-next { background:linear-gradient(180deg,#1e1633,#111827); color:#fff; }
+    .lp-next h5 { color:#fff; font-weight:800; }
+    .lp-next ol { margin:0; padding-left:18px; color:#d1d5db; font-size:13px; }
+    .lp-next li { margin-bottom:8px; }
+    .lp-next .lp-step { display:inline-flex; width:18px; height:18px; margin-right:6px; border-radius:50%; align-items:center; justify-content:center; background:#7c3aed; color:#fff; font-size:10px; font-weight:800; }
+    .lp-submit { min-height:48px; border:0; border-radius:12px; background:#7c3aed; color:#fff; font-weight:800; }
+    .lp-submit:hover { background:#6d28d9; color:#fff; }
+    .select2-container { width:100% !important; }
+    @media (max-width: 991px) { .lp-grid, .lp-hero { display:block; } .lp-hero .btn { margin-top:12px; } }
+</style>
 @endsection
 @section('content')
-<div class="container-fluid">
-    
-    <!-- start page title -->
-    <div class="row">
-        <div class="col-12">
-            <div class="page-title-box">
-                <div class="page-title-right">
-                    <a href="{{route('campaign.index')}}" class="btn btn-primary rounded-pill">Manage</a>
+<div class="container-fluid lp-setup">
+    <div class="lp-hero">
+        <div>
+            <span class="lp-kicker">VISUAL BUILDER WORKFLOW</span>
+            <h4>নতুন Landing Page</h4>
+            <p>প্রথমে প্রোডাক্ট ও বেসিক তথ্য দিন। সেভ করার পর Visual Builder খুলবে — সেখানেই পেজ ডিজাইন ও প্রিভিউ হবে।</p>
+        </div>
+        <a href="{{ route('campaign.index') }}" class="btn btn-light rounded-pill">সব পেজ</a>
+    </div>
+
+    <form action="{{ route('campaign.store') }}" method="POST" enctype="multipart/form-data" data-parsley-validate>
+        @csrf
+        <div class="lp-grid">
+            <div class="card lp-card">
+                <div class="card-body">
+                    <div class="lp-section-title">১. Campaign settings</div>
+                    <div class="mb-3">
+                        <label class="form-label" for="name">Landing page title *</label>
+                        <input type="text" class="form-control @error('name') is-invalid @enderror" name="name" id="name" value="{{ old('name') }}" placeholder="যেমন: Summer Mega Offer" required>
+                        @error('name')<span class="invalid-feedback"><strong>{{ $message }}</strong></span>@enderror
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="product_id">Products *</label>
+                        <select class="select2 form-control @error('product_id') is-invalid @enderror" name="product_id[]" id="product_id" multiple data-placeholder="প্রোডাক্ট বেছে নিন" required>
+                            @foreach($products as $value)
+                                <option value="{{ $value->id }}" @selected(collect(old('product_id', []))->contains($value->id))>{{ $value->name }}</option>
+                            @endforeach
+                        </select>
+                        <span class="lp-help">এই প্রোডাক্টগুলোই builder ও checkout-এ দেখাবে।</span>
+                        @error('product_id')<span class="invalid-feedback d-block"><strong>{{ $message }}</strong></span>@enderror
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="deadline">Offer deadline</label>
+                            <input type="datetime-local" class="form-control" name="deadline" id="deadline" value="{{ old('deadline') }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="video">YouTube URL / ID</label>
+                            <input type="text" class="form-control" name="video" id="video" value="{{ old('video') }}" placeholder="https://youtu.be/...">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="review">Review / offer headline</label>
+                        <input type="text" class="form-control" name="review" id="review" value="{{ old('review') }}" placeholder="কাস্টমার রিভিউ সেকশনের শিরোনাম">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Short description</label>
+                        <textarea name="short_description" class="summernote form-control">{{ old('short_description') }}</textarea>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label">Description</label>
+                        <textarea name="description" class="summernote form-control">{{ old('description') }}</textarea>
+                    </div>
                 </div>
-                <h4 class="page-title">Landing Page Create</h4>
+            </div>
+
+            <div>
+                <div class="card lp-card lp-next mb-3">
+                    <div class="card-body">
+                        <h5 class="mb-3">এরপর কী হবে?</h5>
+                        <ol>
+                            <li><span class="lp-step">1</span>এই ফর্ম সেভ করুন</li>
+                            <li><span class="lp-step">2</span>Visual Builder খুলবে</li>
+                            <li><span class="lp-step">3</span>Template বেছে পেজ সাজান</li>
+                            <li><span class="lp-step">4</span>Preview দিয়ে লাইভ চেক করুন</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="card lp-card mb-3">
+                    <div class="card-body">
+                        <div class="lp-section-title">২. Media</div>
+                        <div class="mb-3">
+                            <label class="form-label" for="banner">Banner</label>
+                            <input type="file" class="form-control" name="banner" id="banner" accept="image/jpeg,image/png,image/webp">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="image_one">Image one</label>
+                            <input type="file" class="form-control" name="image_one" id="image_one" accept="image/jpeg,image/png,image/webp">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="image_two">Image two</label>
+                            <input type="file" class="form-control" name="image_two" id="image_two" accept="image/jpeg,image/png,image/webp">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="image_three">Image three</label>
+                            <input type="file" class="form-control" name="image_three" id="image_three" accept="image/jpeg,image/png,image/webp">
+                        </div>
+                        <div class="mb-0">
+                            <label class="form-label">Review images</label>
+                            <input type="file" class="form-control" name="image[]" accept="image/jpeg,image/png,image/webp" multiple>
+                            <span class="lp-help">Builder-এর review gallery এই ছবিগুলো ব্যবহার করবে।</span>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn lp-submit w-100">সেভ করে Visual Builder খুলুন →</button>
             </div>
         </div>
-    </div>       
-    <!-- end page title --> 
-   <div class="row justify-content-center">
-    <div class="col-lg-10">
-        <div class="card">
-            <div class="card-body">
-                <form action="{{ route('campaign.store') }}" method="POST" class="row" data-parsley-validate="" enctype="multipart/form-data" name="createForm">
-                    @csrf
-                    <div class="col-sm-12">
-                        <div class="form-group mb-3">
-                            <label for="name" class="form-label">Landing Page Title *</label>
-                            <input type="text" class="form-control @error('name') is-invalid @enderror" name="name" value="{{ old('name') }}" id="name" required="">
-                            @error('name')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
-                    </div>
-                    <!-- col-end -->
-                
-                    <div class="col-sm-12 mb-3">
-                        <div class="form-group">
-                            <label for="banner" class="form-label">Banner Image *</label>
-                            <input type="file" class="form-control @error('banner') is-invalid @enderror" name="banner" id="banner" required>
-                            @error('banner')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
-                    </div>
-                    <!-- col end -->
-                
-                    <div class="col-sm-12">
-                        <div class="form-group mb-3">
-                            <label for="banner_title" class="form-label">Banner Title *</label>
-                            <input type="text" class="form-control @error('banner_title') is-invalid @enderror" name="banner_title" value="{{ old('banner_title') }}" id="banner_title" required="">
-                            @error('banner_title')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
-                    </div>
-                    <!-- col-end -->
-                    <div class="col-sm-12">
-                        <div class="form-group mb-3">
-                            <label for="deadline" class="form-label">Deadline</label>
-                            <input type="datetime-local" class="form-control @error('deadline') is-invalid @enderror" name="deadline" value="{{ old('deadline') }}" id="deadline">
-                            @error('deadline')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <div class="col-sm-12">
-                        <div class="form-group mb-3">
-                            <label for="top_title_1" class="form-label">Top Title 1</label>
-                            <input type="text" class="form-control @error('top_title_1') is-invalid @enderror" name="top_title_1" value="{{ old('top_title_1') }}" id="top_title_1">
-                            @error('top_title_1')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <div class="col-sm-12">
-                        <div class="form-group mb-3">
-                            <label for="top_title_2" class="form-label">Top Title 2</label>
-                            <input type="text" class="form-control @error('top_title_2') is-invalid @enderror" name="top_title_2" value="{{ old('top_title_2') }}" id="top_title_2">
-                            @error('top_title_2')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <div class="col-sm-12">
-                        <div class="form-group mb-3">
-                            <label for="heading_1" class="form-label">Heading 1</label>
-                            <input type="text" class="form-control @error('heading_1') is-invalid @enderror" name="heading_1" value="{{ old('heading_1') }}" id="heading_1">
-                            @error('heading_1')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <div class="col-sm-12">
-                        <div class="form-group mb-3">
-                            <label for="feature_1" class="form-label">Feature 1</label>
-                            <input type="text" class="form-control @error('feature_1') is-invalid @enderror" name="feature_1" value="{{ old('feature_1') }}" id="feature_1">
-                            @error('feature_1')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <div class="col-sm-12">
-                        <div class="form-group mb-3">
-                            <label for="feature_2" class="form-label">Feature 2</label>
-                            <input type="text" class="form-control @error('feature_2') is-invalid @enderror" name="feature_2" value="{{ old('feature_2') }}" id="feature_2">
-                            @error('feature_2')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <div class="col-sm-12">
-                        <div class="form-group mb-3">
-                            <label for="heading_2" class="form-label">Heading 2</label>
-                            <input type="text" class="form-control @error('heading_2') is-invalid @enderror" name="heading_2" value="{{ old('heading_2') }}" id="heading_2">
-                            @error('heading_2')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <div class="col-sm-12">
-                        <div class="form-group mb-3">
-                            <label for="heading_3" class="form-label">Heading 3</label>
-                            <input type="text" class="form-control @error('heading_3') is-invalid @enderror" name="heading_3" value="{{ old('heading_3') }}" id="heading_3">
-                            @error('heading_3')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <div class="col-sm-12">
-                        <div class="form-group mb-3">
-                            <label for="heading_4" class="form-label">Heading 4</label>
-                            <input type="text" class="form-control @error('heading_4') is-invalid @enderror" name="heading_4" value="{{ old('heading_4') }}" id="heading_4">
-                            @error('heading_4')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <div class="col-sm-12">
-                        <div class="form-group mb-3">
-                            <label for="note" class="form-label">Note</label>
-                            <input type="text" class="form-control @error('note') is-invalid @enderror" name="note" value="{{ old('note') }}" id="note">
-                            @error('note')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <div class="col-sm-12">
-                        <div class="form-group mb-3">
-                            <label for="billing_details" class="form-label">Billing Details</label>
-                            <input type="text" class="form-control @error('billing_details') is-invalid @enderror" name="billing_details" value="{{ old('billing_details') }}" id="billing_details">
-                            @error('billing_details')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <div class="col-sm-12">
-                        <div class="form-group mb-3">
-                            <label for="video" class="form-label">Youtube Video ID</label>
-                            <input type="text" class="form-control @error('video') is-invalid @enderror" name="video" value="{{ old('video') }}" id="video">
-                            @error('video')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
-                    </div>
-                    <div class="col-sm-12">
-                        <div class="form-group mb-3">
-                            <label for="product_id" class="form-label">Products *</label>
-                            <select class="select2 form-control @error('product_id') is-invalid @enderror" 
-                                    name="product_id[]" 
-                                    multiple="multiple" 
-                                    data-placeholder="Choose ..." 
-                                    required>
-                                @foreach($products as $value)
-                                    <option value="{{ $value->id }}">{{ $value->name }}</option>
-                                @endforeach
-                            </select>
-                            @error('product_id')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <!-- col end -->
-                
-                    <div class="col-sm-6 mb-3">
-                        <div class="form-group">
-                            <label for="image_one" class="form-label">Image One *</label>
-                            <input type="file" class="form-control @error('image_one') is-invalid @enderror" name="image_one" id="image_one" required="">
-                            @error('image_one')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
-                    </div>
-                
-                    <div class="col-sm-6 mb-3">
-                        <div class="form-group">
-                            <label for="image_two" class="form-label">Image Two</label>
-                            <input type="file" class="form-control @error('image_two') is-invalid @enderror" name="image_two" id="image_two">
-                            @error('image_two')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
-                    </div>
-                
-                    <div class="col-sm-6 mb-3">
-                        <div class="form-group">
-                            <label for="image_three" class="form-label">Image Three</label>
-                            <input type="file" class="form-control @error('image_three') is-invalid @enderror" name="image_three" id="image_three">
-                            @error('image_three')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
-                    </div>
-                    <!-- col end -->
-                
-                    <div class="col-sm-6 mb-3">
-                        <label for="image">Review Image *</label>
-                        <div class="input-group control-group increment">
-                            <input type="file" name="image[]" class="form-control @error('image') is-invalid @enderror" required />
-                            <div class="input-group-btn">
-                                <button class="btn btn-success btn-increment" type="button"><i class="fa fa-plus"></i></button>
-                            </div>
-                            @error('image')
-                            <span class="invalid-feedback" role="alert">
-                                <strong>{{ $message }}</strong>
-                            </span>
-                            @enderror
-                        </div>
-                        <div class="clone hide" style="display: none;">
-                            <div class="control-group input-group">
-                                <input type="file" name="image[]" class="form-control" />
-                                <div class="input-group-btn">
-                                    <button class="btn btn-danger" type="button"><i class="fa fa-trash"></i></button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- col end -->
-                
-                    <div class="col-sm-6 mb-3">
-                        <div class="form-group mb-3">
-                            <label for="review" class="form-label">Review *</label>
-                            <input type="text" class="form-control @error('review') is-invalid @enderror" name="review" value="{{ old('review') }}" id="review" required="">
-                            @error('review')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
-                    </div>
-                    <!-- col-end -->
-                
-                    <div class="col-sm-12 mb-3">
-                        <div class="form-group">
-                            <label for="short_description" class="form-label">Short Description *</label>
-                            <textarea name="short_description" rows="6" class="summernote form-control @error('short_description') is-invalid @enderror" required="">{{ old('short_description') }}</textarea>
-                            @error('short_description')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
-                    </div>
-                    <!-- col end -->
-                
-                    <div class="col-sm-12 mb-3">
-                        <div class="form-group">
-                            <label for="description" class="form-label">Description *</label>
-                            <textarea name="description" rows="6" class="summernote form-control @error('description') is-invalid @enderror" required="">{{ old('description') }}</textarea>
-                            @error('description')
-                                <span class="invalid-feedback" role="alert">
-                                    <strong>{{ $message }}</strong>
-                                </span>
-                            @enderror
-                        </div>
-                    </div>
-                    <!-- col end -->
-                
-                  
-                    <!-- col end -->
-                
-                    <div>
-                        <input type="submit" class="btn btn-success" value="Create Campaign">
-                    </div>
-                </form>
-
-            </div> <!-- end card-body-->
-        </div> <!-- end card-->
-    </div> <!-- end col-->
-   </div>
+    </form>
 </div>
 @endsection
-
-
 @section('script')
 <script src="{{asset('public/backEnd/')}}/assets/libs/parsleyjs/parsley.min.js"></script>
 <script src="{{asset('public/backEnd/')}}/assets/js/pages/form-validation.init.js"></script>
 <script src="{{asset('public/backEnd/')}}/assets/libs/select2/js/select2.min.js"></script>
-<script src="{{asset('public/backEnd/')}}/assets/js/pages/form-advanced.init.js"></script>
-<script src="{{asset('public/backEnd/')}}/assets/libs/flatpickr/flatpickr.min.js"></script>
-<script src="{{asset('public/backEnd/')}}/assets/js/pages/form-pickers.init.js"></script>
-
-<script src="{{asset('public/backEnd/')}}/assets/libs//summernote/summernote-lite.min.js"></script>
+<script src="{{asset('public/backEnd/')}}/assets/libs/summernote/summernote-lite.min.js"></script>
 <script>
-    $(".summernote").summernote({
-        placeholder: "Enter Your Text Here",    
-    });
-</script>
-<script type="text/javascript">
-    $(document).ready(function () {
-        $(".btn-increment").click(function () {
-            var html = $(".clone").html();
-            $(".increment").after(html);
-        });
-        $("body").on("click", ".btn-danger", function () {
-            $(this).parents(".control-group").remove();
-        });
-        $('.select2').select2();
-    });
+    $(".summernote").summernote({ placeholder: "লিখুন...", height: 140 });
+    $('.select2').select2({ width: '100%' });
 </script>
 @endsection
