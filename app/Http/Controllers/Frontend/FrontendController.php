@@ -173,7 +173,7 @@ $brands = Brand::where('status', 1)
                         $q->select('id', 'name', 'slug', 'new_price', 'old_price', 'category_id')
                             ->where('status', 1)
                             ->where('approval_status', 'approved')
-                            ->with(['image', 'prosizes', 'procolors', 'reviews']);
+                            ->with(['image', 'prosizes', 'procolors', 'variantPrices.color', 'variantPrices.size', 'reviews']);
                     }
                 ])
                 ->get()
@@ -196,7 +196,7 @@ $brands = Brand::where('status', 1)
             $all_products = Product::where(['status' => 1, 'approval_status' => 'approved'])
                 ->inRandomOrder()
                 ->select('id', 'name', 'slug', 'new_price', 'old_price', 'sold', 'stock')
-                ->with(['prosizes', 'procolors', 'image', 'reviews'])
+                ->with(['prosizes', 'procolors', 'variantPrices.color', 'variantPrices.size', 'image', 'reviews'])
                 ->limit(12)
                 ->get();
         } else {

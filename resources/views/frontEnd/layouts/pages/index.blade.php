@@ -86,11 +86,19 @@
         for ($i = 1; $i <= 5; $i++) { $stars .= '<span class="' . ($i <= round($avg) ? '' : 'off') . '">★</span>'; }
         $stars .= '</div>';
 
+        /* Variant stock is the source of truth. Product stock displays the sum of
+           every size/color variant so a product is not incorrectly marked out. */
+        $variantRows = (isset($p->variantPrices) && $p->variantPrices->count()) ? $p->variantPrices : collect();
+        $hasVariantStock = $variantRows->contains(fn($v) => $v->stock !== null);
+        $displayStock = $hasVariantStock
+            ? (int) $variantRows->sum(fn($v) => max(0, (int) $v->stock))
+            : (int) ($p->stock ?? 0);
+
         /* --- Sold / Left প্রগ্রেস (urgency) --- */
         $soldHtml = '';
         if ($showSold) {
             $sold  = (int) ($p->sold ?? 0);
-            $stock = (int) ($p->stock ?? 0);
+            $stock = $displayStock;
             $tot   = max($sold + $stock, 1);
             $pct   = min(100, round($sold * 100 / $tot));
             $soldHtml = '<div class="cd-sold"><span>Sold ' . $sold . '</span><span>Left ' . $stock . '</span></div>'
@@ -98,7 +106,7 @@
         }
 
         /* --- স্টক আউট --- */
-        $isOut = (isset($p->stock) && $p->stock !== null && $p->stock <= 0);
+        $isOut = $displayStock <= 0;
         $out   = $isOut ? '<div class="cd-stock-out">স্টক শেষ</div>' : '';
 
         /* ---------------------------------------------------------
@@ -118,7 +126,13 @@
                     'st' => $v->stock === null ? null : (int) $v->stock,
                 ];
                 if ($v->size_id && $v->size) {
-                    $sizes[$v->size_id] = ['id' => (int) $v->size_id, 'name' => $v->size->sizeName];
+                    if (!isset($sizes[$v->size_id])) {
+                        $sizes[$v->size_id] = ['id' => (int) $v->size_id, 'name' => $v->size->sizeName, 'stock' => 0, 'has_stock' => false];
+                    }
+                    if ($v->stock !== null) {
+                        $sizes[$v->size_id]['stock'] += max(0, (int) $v->stock);
+                        $sizes[$v->size_id]['has_stock'] = true;
+                    }
                 }
                 if ($v->color_id && $v->color) {
                     $colors[$v->color_id] = ['id' => (int) $v->color_id, 'name' => $v->color->colorName, 'hex' => $v->color->color];
@@ -151,7 +165,7 @@
             'url'    => $url,
             'price'  => (float) $p->new_price,
             'old'    => (float) ($p->old_price ?? 0),
-            'stock'  => (int) ($p->stock ?? 0),
+            'stock'  => $displayStock,
             'sizes'    => $sizes,
             'colors'   => $colors,
             'variants' => $variants,
@@ -359,6 +373,8 @@
 .cd-lbl .cd-req{font-size:11px;font-weight:600;color:var(--cd-muted);}
 .cd-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
 .cd-chip{border:1.5px solid #dfe3e8;background:#fff;min-width:48px;padding:8px 15px;border-radius:9px;font-size:13.5px;font-weight:600;cursor:pointer;transition:.18s;font-family:inherit;position:relative;}
+.cd-chip-stock{display:block;font-size:10px;color:#12a150;margin-top:2px;font-weight:600;}
+.cd-chip.cd-off .cd-chip-stock{color:#e11d48;}
 .cd-chip:hover{border-color:var(--cd-primary);}
 .cd-chip.on{border-color:var(--cd-primary);background:var(--cd-primary);color:#fff;box-shadow:0 4px 12px rgba(48,61,110,.28);}
 .cd-chip .cd-dot{display:inline-block;width:13px;height:13px;border-radius:50%;border:1px solid rgba(0,0,0,.15);margin-right:6px;vertical-align:-2px;}
@@ -902,7 +918,10 @@
             b.type = 'button';
             b.className = 'cd-chip';
             b.dataset.id = o.id;
-            b.innerHTML = (type === 'color' && o.hex ? '<span class="cd-dot" style="background:' + o.hex + '"></span>' : '') + o.name;
+            b.dataset.stock = (type === 'size' && o.has_stock) ? o.stock : '';
+            if(type === 'size' && o.has_stock && Number(o.stock) <= 0){ b.classList.add('cd-off'); }
+            b.innerHTML = (type === 'color' && o.hex ? '<span class="cd-dot" style="background:' + o.hex + '"></span>' : '') + o.name +
+                (type === 'size' && o.has_stock ? '<small class="cd-chip-stock">' + (o.stock > 0 ? o.stock + ' টি' : 'স্টক শেষ') + '</small>' : '');
             b.onclick = function(){ if(!b.classList.contains('cd-off')) pick(type, o.id, idx); };
             box.appendChild(b);
         });
@@ -942,8 +961,15 @@
                          (!p.colors.length || cd.color != null);
 
             if(chosen && match.length){
-                if(match[0].p > 0)          cd.price = match[0].p;
-                if(match[0].st !== null)    cd.stock = match[0].st;
+                if(match[0].p > 0) cd.price = match[0].p;
+                // Size stock is the sum of all colors for that size. When a
+                // color is selected, use the exact size+color variant stock.
+                var stockRows = match.filter(function(v){ return v.st !== null; });
+                if(stockRows.length){
+                    cd.stock = (cd.color != null || stockRows.length === 1)
+                        ? Number(stockRows[0].st)
+                        : stockRows.reduce(function(sum, v){ return sum + Number(v.st); }, 0);
+                }
             } else {
                 cd.price = p.price;
                 cd.stock = p.stock;
@@ -976,7 +1002,8 @@
     function avail(boxId, fn){
         var box = document.getElementById(boxId);
         [].forEach.call(box.children, function(b){
-            var ok = fn(b.dataset.id);
+            var hasStock = !b.dataset.stock || Number(b.dataset.stock) > 0;
+            var ok = fn(b.dataset.id) && hasStock;
             b.classList.toggle('cd-off', !ok);
             if(!ok) b.classList.remove('on');
         });

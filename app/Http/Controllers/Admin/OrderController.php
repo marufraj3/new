@@ -61,11 +61,20 @@ class OrderController extends Controller
         // 1) প্রথমবার active status এ ঢুকলে স্টক কমবে
         if (in_array($newStatus, $activeStatuses) && !in_array($oldStatus, $activeStatuses)) {
             $details = OrderDetails::where('order_id', $order->id)
-                ->with('product:id,stock') // ✅ Eager load products to avoid N+1
+                ->with('product:id,stock')
                 ->get();
 
             foreach ($details as $row) {
-                if ($row->product) {
+                $variant = $row->variant_price_id
+                    ? ProductVariantPrice::find($row->variant_price_id)
+                    : ProductVariantPrice::where('product_id', $row->product_id)
+                        ->when($row->product_size, fn($q) => $q->where('size_id', $row->product_size))
+                        ->when($row->product_color, fn($q) => $q->where('color_id', $row->product_color))
+                        ->first();
+                if ($variant && $variant->stock !== null) {
+                    $variant->stock = max(0, (int) $variant->stock - (int) $row->qty);
+                    $variant->save();
+                } elseif ($row->product) {
                     $row->product->stock = max(0, $row->product->stock - $row->qty);
                     $row->product->save();
                 }
@@ -75,11 +84,20 @@ class OrderController extends Controller
         // 2) cancel (11) হলে, যদি আগেরটা active group এ থাকে -> স্টক রিস্টোর
         if ($newStatus == 11 && in_array($oldStatus, $activeStatuses)) {
             $details = OrderDetails::where('order_id', $order->id)
-                ->with('product:id,stock') // ✅ Eager load products to avoid N+1
+                ->with('product:id,stock')
                 ->get();
 
             foreach ($details as $row) {
-                if ($row->product) {
+                $variant = $row->variant_price_id
+                    ? ProductVariantPrice::find($row->variant_price_id)
+                    : ProductVariantPrice::where('product_id', $row->product_id)
+                        ->when($row->product_size, fn($q) => $q->where('size_id', $row->product_size))
+                        ->when($row->product_color, fn($q) => $q->where('color_id', $row->product_color))
+                        ->first();
+                if ($variant && $variant->stock !== null) {
+                    $variant->stock = (int) $variant->stock + (int) $row->qty;
+                    $variant->save();
+                } elseif ($row->product) {
                     $row->product->stock = $row->product->stock + $row->qty;
                     $row->product->save();
                 }
@@ -1923,6 +1941,7 @@ class OrderController extends Controller
             $order_details->qty              = $cart->qty;
             $order_details->product_size     = $savedSize;
             $order_details->product_color    = $savedColor;
+            $order_details->variant_price_id = $cart->options->variant_price_id ?? null;
             $order_details->save();
         }
 
