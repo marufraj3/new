@@ -250,6 +250,15 @@
   </a>
 </li>
 
+{{-- 🤖 Gemini Assistant --}}
+<li class="{{ request()->routeIs('admin.gemini.*') ? 'active' : '' }}">
+  <a href="{{ route('admin.gemini.index') }}" style="{{ request()->routeIs('admin.gemini.*') ? 'background: linear-gradient(135deg, #4338ca, #7c3aed); color:#fff; border-radius:8px;' : '' }}">
+    <i data-feather="message-circle"></i>
+    <span> Gemini Assistant </span>
+    <span class="badge bg-gradient" style="background: linear-gradient(135deg, #ff6b6b, #5b49d6); color:#fff; font-size:9px; margin-left:4px;">AI</span>
+  </a>
+</li>
+
 @can('order-create')
 <li>
   <a href="{{route('admin.order.create')}}">
