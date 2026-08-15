@@ -16,6 +16,7 @@ use App\Models\Color;
 use App\Models\District;
 use App\Models\CreatePage;
 use App\Models\Campaign;
+use App\Models\TiktokPixel;
 use App\Models\Banner;
 use App\Models\ShippingCharge;
 use App\Models\Productcolor;
@@ -1114,41 +1115,80 @@ $brands = Brand::where('status', 1)
 
     public function campaign($slug)
     {
-        $campaign_data = Campaign::where('slug', $slug)->with('images')->first();
+        $campaign_data = Campaign::with('images')
+            ->where('slug', $slug)
+            ->firstOrFail();
 
-        $products = Product::whereIn('id', function($query) use ($campaign_data) {
-            $query->select('product_id')
-                  ->from('campaign_product')
-                  ->where('campaign_id', $campaign_data->id);
-        })->orWhere('id', $campaign_data->product_id)
-          ->where('status', 1)
-          ->where('approval_status', 'approved')
-          ->with('image')
-          ->get();
+        // Keep the primary product first, then all pivot products in a deterministic order.
+        // Applying availability conditions after a grouped ID constraint prevents the old
+        // orWhere() branch from accidentally exposing inactive/unapproved primary products.
+        $productIds = DB::table('campaign_product')
+            ->where('campaign_id', $campaign_data->id)
+            ->pluck('product_id')
+            ->push($campaign_data->product_id)
+            ->filter()
+            ->unique()
+            ->values();
 
+        $products = Product::query()
+            ->whereIn('id', $productIds)
+            ->where('status', 1)
+            ->where('approval_status', 'approved')
+            ->with([
+                'image',
+                'sizes',
+                'colors',
+                'variantPrices.size',
+                'variantPrices.color',
+            ])
+            ->when($campaign_data->product_id, function ($query, $primaryProductId) {
+                $query->orderByRaw('CASE WHEN products.id = ? THEN 0 ELSE 1 END', [$primaryProductId]);
+            })
+            ->orderBy('products.id')
+            ->get();
+
+        abort_if($products->isEmpty(), 404, 'No available product is assigned to this campaign.');
+
+        // A campaign is a single-product checkout flow. Start it with the deterministic
+        // primary/first available product and safely handle products without an image.
         Cart::instance('shopping')->destroy();
-        $cart_count = Cart::instance('shopping')->count();
         $product = $products->first();
-        if ($cart_count == 0 && $product) {
+        if ($product) {
             Cart::instance('shopping')->add([
-                'id'   => $product->id,
-                'name' => $product->name,
-                'qty'  => 1,
-                'price'=> $product->new_price,
+                'id'    => $product->id,
+                'name'  => $product->name,
+                'qty'   => 1,
+                'price' => (float) ($product->new_price ?? $product->old_price ?? 1),
                 'options' => [
-                    'slug'           => $product->slug,
-                    'image'          => $product->image->image,
-                    'old_price'      => $product->old_price,
-                    'purchase_price' => $product->purchase_price,
+                    'slug'             => $product->slug,
+                    'image'            => optional($product->image)->image ?? 'public/uploads/default.webp',
+                    'old_price'        => (float) ($product->old_price ?? 0),
+                    'purchase_price'   => (float) ($product->purchase_price ?? 0),
+                    'product_size'     => null,
+                    'product_color'    => null,
+                    'size_id'          => null,
+                    'color_id'         => null,
+                    'variant_price_id' => null,
+                    'pro_unit'         => $product->pro_unit ?? null,
+                    'advance_amount'   => (float) ($product->advance_amount ?? 0),
+                    'is_digital'       => (int) ($product->is_digital ?? 0),
+                    'free_delivery'    => (int) ($product->free_delivery ?? 0),
                 ],
             ]);
         }
 
-        $shippingcharge = ShippingCharge::where('status', 1)->get();
-        $select_charge  = ShippingCharge::where('status', 1)->first();
+        $shippingcharge = ShippingCharge::where('status', 1)->orderBy('id')->get();
+        $select_charge = $shippingcharge->first();
         if ($select_charge) {
             Session::put('shipping', $select_charge->amount);
+        } else {
+            Session::put('shipping', 0);
         }
+
+        // The legacy campaign view and standalone builder both need this explicitly.
+        $tiktok_pixels = Cache::remember('tiktok_pixels_list', 1800, function () {
+            return TiktokPixel::where('status', 1)->get();
+        });
 
         // Facebook CAPI ViewContent — server-side, event_id দিয়ে Pixel-এর সাথে deduplicate হবে
         $fb_view_content_event_id = 'vc_camp' . $campaign_data->id . '_' . time();
@@ -1174,12 +1214,20 @@ $brands = Brand::where('status', 1)
             // Silently fail — page load block করবে না
         }
 
+        $viewData = compact(
+            'campaign_data',
+            'products',
+            'shippingcharge',
+            'tiktok_pixels',
+            'fb_view_content_event_id'
+        );
+
         // Page builder দিয়ে ডিজাইন করা থাকলে আলাদা ভিউ
         if (!empty($campaign_data->page_html)) {
-            return view('frontEnd.layouts.pages.campaign.campaign-builder', compact('campaign_data', 'products', 'shippingcharge', 'fb_view_content_event_id'));
+            return view('frontEnd.layouts.pages.campaign.campaign-builder', $viewData);
         }
 
-        return view('frontEnd.layouts.pages.campaign.campaign', compact('campaign_data', 'products', 'shippingcharge', 'fb_view_content_event_id'));
+        return view('frontEnd.layouts.pages.campaign.campaign', $viewData);
     }
 
     public function payment_success(Request $request)

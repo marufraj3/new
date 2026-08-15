@@ -1,0 +1,103 @@
+/* Dynamic storefront elements mounted inside visual campaign pages. */
+html { scroll-behavior: smooth; }
+body { margin: 0; color: #172033; background: #fff; }
+body.cpb-store-busy { overflow: hidden; }
+
+.cpb-live-product { overflow: hidden; border: 1px solid #e6eaf0; border-radius: 16px; background: #fff; box-shadow: 0 9px 28px rgba(22, 32, 51, .08); transition: .2s ease; }
+.cpb-live-product:hover, .cpb-live-product.is-selected { border-color: #16a34a; box-shadow: 0 14px 34px rgba(22, 163, 74, .15); transform: translateY(-3px); }
+.cpb-live-product-image { position: relative; overflow: hidden; aspect-ratio: 4 / 3; background: #f4f6f8; }
+.cpb-live-product-image img { width: 100%; height: 100%; object-fit: cover; transition: transform .35s ease; }
+.cpb-live-product:hover .cpb-live-product-image img { transform: scale(1.035); }
+.cpb-live-product-image > span { position: absolute; top: 12px; left: 12px; padding: 5px 9px; border-radius: 999px; color: #fff; background: #e11d48; font-size: 11px; font-weight: 800; }
+.cpb-live-product-body { padding: 17px; }
+.cpb-live-product-body h3 { min-height: 45px; margin: 0 0 7px; font-size: 17px; line-height: 1.35; }
+.cpb-live-price { display: flex; margin-bottom: 13px; align-items: center; gap: 8px; }
+.cpb-live-price strong { color: #16a34a; font-size: 22px; }
+.cpb-live-price del { color: #94a3b8; font-size: 14px; }
+.cpb-live-product-button { display: flex; width: 100%; min-height: 45px; padding: 9px 15px; border: 0; border-radius: 10px; align-items: center; justify-content: center; color: #fff; background: #16a34a; font-weight: 800; transition: .15s; }
+.cpb-live-product-button:hover { background: #15803d; }
+.cpb-live-review { overflow: hidden; border-radius: 13px; background: #f7f8fa; box-shadow: 0 7px 20px rgba(20, 30, 50, .08); }
+.cpb-live-review img { display: block; width: 100%; height: 260px; object-fit: cover; }
+.cpb-empty-dynamic { grid-column: 1 / -1; padding: 28px; border: 1px dashed #cad1dc; border-radius: 12px; color: #7b8493; text-align: center; }
+
+.cpb-live-checkout { max-width: 1180px; margin: 0 auto; color: #172033; font-family: Arial, "Noto Sans Bengali", sans-serif; }
+.cpb-checkout-products { margin-bottom: 22px; padding: 18px; border: 1px solid #e1e7ef; border-radius: 15px; background: #fff; }
+.cpb-checkout-eyebrow { margin-bottom: 12px; font-size: 13px; font-weight: 800; text-align: center; }
+.cpb-compact-products { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.cpb-compact-product { display: flex; min-height: 68px; padding: 8px; border: 1px solid #e0e5ec; border-radius: 10px; align-items: center; gap: 10px; color: #344054; background: #fff; text-align: left; transition: .15s; }
+.cpb-compact-product:hover, .cpb-compact-product.is-selected { border-color: #16a34a; background: #f0fdf4; box-shadow: 0 0 0 2px rgba(22, 163, 74, .08); }
+.cpb-compact-product img { flex: 0 0 50px; width: 50px; height: 50px; border-radius: 8px; object-fit: cover; }
+.cpb-compact-product span { display: grid; gap: 3px; }
+.cpb-compact-product strong { font-size: 12px; line-height: 1.3; }
+.cpb-compact-product small { color: #16a34a; font-size: 12px; font-weight: 800; }
+.cpb-variant-picker { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 620px; margin: 0 auto 22px; padding: 14px; border: 1px solid #dce4ee; border-radius: 12px; gap: 12px; background: #fff; }
+.cpb-variant-picker[hidden], .cpb-variant-field[hidden] { display: none; }
+.cpb-variant-field label { display: block; margin-bottom: 6px; color: #526071; font-size: 12px; font-weight: 700; }
+.cpb-variant-field select { width: 100%; height: 43px; padding: 0 10px; border: 1px solid #d6dce5; border-radius: 8px; color: #263244; background: #fff; }
+
+.cpb-checkout-columns { display: grid; grid-template-columns: 1.08fr .92fr; align-items: start; gap: 22px; }
+.cpb-order-summary, .cpb-customer-form { overflow: hidden; border: 1px solid #e0e6ee; border-radius: 17px; background: #fff; box-shadow: 0 14px 38px rgba(21, 32, 51, .09); }
+.cpb-checkout-card-head { display: flex; padding: 17px 20px; border-bottom: 1px solid #e8ecf2; align-items: center; gap: 11px; background: #f8fafc; }
+.cpb-checkout-card-head > span { display: grid; flex: 0 0 34px; width: 34px; height: 34px; border-radius: 50%; place-items: center; color: #fff; background: #16a34a; font-weight: 900; }
+.cpb-checkout-card-head > div { display: grid; }
+.cpb-checkout-card-head strong { font-size: 15px; }
+.cpb-checkout-card-head small { color: #7b8494; font-size: 11px; }
+.cpb-cartlist { padding: 16px; overflow-x: auto; }
+.cpb-cartlist table { width: 100%; margin: 0; border-collapse: collapse; font-size: 13px; }
+.cpb-cartlist th, .cpb-cartlist td { padding: 10px 7px; border: 1px solid #e6eaf0; vertical-align: middle; }
+.cpb-cartlist thead th { color: #536074; background: #f8fafc; }
+.cpb-cartlist tfoot tr:last-child { color: #14532d; background: #f0fdf4; font-size: 14px; }
+.cpb-cartlist td img { margin-right: 6px; border-radius: 6px; object-fit: cover; }
+.cpb-cartlist a { color: #344054; text-decoration: none; }
+.cpb-cartlist p { margin: 2px 0; font-size: 10px; }
+.cpb-cartlist .quantity { display: inline-flex; overflow: hidden; border: 1px solid #d5dbe4; border-radius: 8px; align-items: center; background: #fff; }
+.cpb-cartlist .quantity button { width: 31px; height: 31px; padding: 0; border: 0; color: #344054; background: #f1f4f7; font-weight: 800; }
+.cpb-cartlist .quantity input { width: 34px; height: 31px; padding: 0; border: 0; outline: 0; text-align: center; }
+.cpb-cartlist .cart_remove { cursor: pointer; }
+.cpb-checkout-assurance { display: flex; padding: 12px 17px 16px; justify-content: center; flex-wrap: wrap; gap: 15px; color: #527060; font-size: 11px; font-weight: 700; }
+
+.cpb-customer-form form { padding: 19px; }
+.cpb-form-field { margin-bottom: 14px; }
+.cpb-form-field label { display: block; margin-bottom: 6px; color: #445064; font-size: 12px; font-weight: 750; }
+.cpb-form-field label span { color: #dc2626; }
+.cpb-form-field label small { color: #929aa7; font-weight: 500; }
+.cpb-form-field input, .cpb-form-field select, .cpb-form-field textarea { width: 100%; min-height: 45px; padding: 10px 12px; border: 1px solid #d8dee7; border-radius: 9px; outline: 0; color: #263244; background: #fff; font-size: 13px; transition: .15s; }
+.cpb-form-field textarea { min-height: 76px; resize: vertical; }
+.cpb-form-field input:focus, .cpb-form-field select:focus, .cpb-form-field textarea:focus { border-color: #16a34a; box-shadow: 0 0 0 3px rgba(22, 163, 74, .1); }
+.cpb-place-order { display: flex; width: 100%; min-height: 53px; padding: 12px 20px; border: 0; border-radius: 10px; align-items: center; justify-content: space-between; color: #fff; background: linear-gradient(135deg, #16a34a, #15803d); box-shadow: 0 12px 24px rgba(22, 163, 74, .24); font-size: 16px; font-weight: 900; }
+.cpb-place-order:hover { background: linear-gradient(135deg, #15803d, #166534); }
+.cpb-place-order:disabled { cursor: wait; opacity: .65; }
+.cpb-place-order strong { font-size: 24px; }
+.cpb-form-privacy { margin: 10px 0 0; color: #8a93a2; font-size: 10px; text-align: center; }
+.cpb-form-errors { margin: 15px 18px 0; padding: 11px 13px; border: 1px solid #fecaca; border-radius: 9px; color: #991b1b; background: #fef2f2; font-size: 12px; }
+.cpb-form-errors ul { margin: 5px 0 0; padding-left: 19px; }
+
+.cpb-store-loading { position: fixed; z-index: 9999; inset: 0; display: grid; padding: 30px; place-content: center; justify-items: center; gap: 12px; color: #fff; background: rgba(15, 23, 42, .65); backdrop-filter: blur(3px); }
+.cpb-store-loading[hidden] { display: none; }
+.cpb-store-loading span { display: block; width: 42px; height: 42px; border: 4px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: cpb-store-spin .7s linear infinite; }
+.cpb-store-loading strong { font-size: 13px; }
+@keyframes cpb-store-spin { to { transform: rotate(360deg); } }
+.cpb-store-toast { position: fixed; z-index: 10000; right: 18px; bottom: 80px; max-width: 330px; padding: 12px 15px; border-radius: 10px; color: #fff; background: #b91c1c; box-shadow: 0 15px 35px rgba(15,23,42,.23); font-size: 12px; opacity: 0; pointer-events: none; transform: translateY(10px); transition: .2s; }
+.cpb-store-toast.is-visible { opacity: 1; transform: translateY(0); }
+.cpb-sticky-order { position: fixed; z-index: 900; right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); display: flex; min-height: 50px; padding: 12px 19px; border: 0; border-radius: 999px; align-items: center; gap: 9px; color: #fff; background: #16a34a; box-shadow: 0 15px 35px rgba(22, 101, 52, .28); font-size: 13px; font-weight: 850; }
+.cpb-sticky-order[hidden] { display: none; }
+
+@media (max-width: 767px) {
+    .cpb-checkout-columns { grid-template-columns: 1fr; }
+    .cpb-compact-products { grid-template-columns: 1fr 1fr; }
+    .cpb-variant-picker { grid-template-columns: 1fr; }
+    .cpb-cartlist { padding: 10px; }
+    .cpb-cartlist table { font-size: 11px; }
+    .cpb-cartlist th, .cpb-cartlist td { padding: 7px 4px; }
+    .cpb-cartlist td img { display: none; }
+    .cpb-cartlist .quantity button { width: 27px; }
+    .cpb-cartlist .quantity input { width: 27px; }
+    .cpb-live-review img { height: auto; max-height: 420px; }
+    .cpb-sticky-order { right: 12px; bottom: 12px; min-height: 46px; padding: 10px 16px; }
+}
+
+@media (max-width: 430px) {
+    .cpb-compact-products { grid-template-columns: 1fr; }
+    .cpb-checkout-card-head { padding: 14px; }
+    .cpb-customer-form form { padding: 14px; }
+}

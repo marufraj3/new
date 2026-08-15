@@ -7,6 +7,9 @@ use Illuminate\Http\Request;
 use App\Models\Product;
 use App\Models\CampaignReview;
 use App\Models\Campaign;
+use App\Services\CampaignPageSanitizer;
+use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 use Image;
 use Toastr;
 use Str;
@@ -310,6 +313,126 @@ class CampaignController extends Controller
 
         Toastr::success('Success','Data update successfully');
         return redirect()->route('campaign.index');
+    }
+
+    /**
+     * Full-screen visual editor. Campaign metadata and product association continue to
+     * live in the legacy edit form; this screen owns only the published page design.
+     */
+    public function builder($id)
+    {
+        $campaign = Campaign::with(['images', 'products.image'])
+            ->findOrFail($id);
+
+        $productIds = $campaign->products->pluck('id')
+            ->push($campaign->product_id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        $products = Product::query()
+            ->whereIn('id', $productIds)
+            ->with('image')
+            ->get();
+
+        return view('backEnd.campaign.builder', compact('campaign', 'products'));
+    }
+
+    /**
+     * Persist both the editable JSON and a sanitized, ready-to-render storefront snapshot.
+     */
+    public function saveBuilder(Request $request, $id, CampaignPageSanitizer $sanitizer)
+    {
+        $campaign = Campaign::findOrFail($id);
+
+        $validated = $request->validate([
+            'page_design' => ['required', 'string', 'max:2097152'],
+            'page_html'   => ['required', 'string', 'max:2097152'],
+            'page_css'    => ['nullable', 'string', 'max:204800'],
+        ]);
+
+        try {
+            $design = $sanitizer->design($validated['page_design']);
+            $html = $sanitizer->html($validated['page_html']);
+            $css = $sanitizer->css($validated['page_css'] ?? null);
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'page_design' => $exception->getMessage(),
+            ]);
+        }
+
+        if ($html === null) {
+            throw ValidationException::withMessages([
+                'page_html' => 'Add at least one section before publishing the landing page.',
+            ]);
+        }
+
+        $campaign->forceFill([
+            'page_design' => $design,
+            'page_html'   => $html,
+            'page_css'    => $css,
+        ])->save();
+
+        return response()->json([
+            'success'  => true,
+            'message'  => 'Landing page saved successfully.',
+            'saved_at' => now()->toIso8601String(),
+            'preview'  => route('campaign', $campaign->slug),
+        ]);
+    }
+
+    /**
+     * Disable the visual page and immediately restore the existing legacy campaign view.
+     */
+    public function clearBuilder($id)
+    {
+        $campaign = Campaign::findOrFail($id);
+        $campaign->forceFill([
+            'page_design' => null,
+            'page_html'   => null,
+            'page_css'    => null,
+        ])->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Visual design cleared. The legacy campaign page is active again.',
+        ]);
+    }
+
+    /**
+     * Secure image endpoint used by builder image controls.
+     */
+    public function uploadBuilderImage(Request $request)
+    {
+        $validated = $request->validate([
+            'image' => [
+                'required',
+                'file',
+                'image',
+                'mimes:jpeg,jpg,png,webp,gif',
+                'max:5120',
+                'dimensions:max_width=8000,max_height=8000',
+            ],
+        ]);
+
+        $image = $validated['image'];
+        $extension = strtolower($image->guessExtension() ?: $image->getClientOriginalExtension());
+        if (!in_array($extension, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true)) {
+            throw ValidationException::withMessages(['image' => 'Unsupported image format.']);
+        }
+
+        $directory = 'uploads/campaign/builder/' . now()->format('Y/m');
+        File::ensureDirectoryExists(public_path($directory), 0755, true);
+
+        $filename = Str::uuid()->toString() . '.' . $extension;
+        $image->move(public_path($directory), $filename);
+        $relativePath = 'public/' . $directory . '/' . $filename;
+
+        return response()->json([
+            'success' => true,
+            'url'     => asset($relativePath),
+            'path'    => $relativePath,
+        ]);
     }
  
     public function inactive(Request $request)
