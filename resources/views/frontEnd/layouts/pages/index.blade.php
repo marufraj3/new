@@ -60,7 +60,7 @@
     @if(($frontcategory ?? collect())->count())
         <div class="sf-sec-head">
             <div>
-                <h2 class="sf-sec-head__ttl">Shop by Category</h2>
+                <h2 class="sf-sec-head__ttl">Top Categories</h2>
                 <p class="sf-sec-head__sub">Find everything you need, organised neatly</p>
             </div>
             <a class="sf-sec-head__link" href="{{ route('shop') }}">View All <i class="fa-solid fa-arrow-right"></i></a>
