@@ -677,11 +677,16 @@
     /* ---------- কার্ট কাউন্ট অ্যাজাক্স আপডেট (নিরাপদ) ---------- */
     function qoRefreshCartCount() {
         fetch("{{ route('cart.count') }}", { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-            .then(function (r) { return r.json(); })
-            .then(function (d) {
-                var n = (d && (d.count || d.length)) || 0;
-                var c = document.querySelector('.cart_count, #cart-qty span, .mobilecart-qty');
-                if (c && n) c.textContent = n;
+            .then(function (r) { return r.text(); })
+            .then(function (html) {
+                var box = document.createElement('div');
+                box.innerHTML = html;
+                var source = box.querySelector('.cart_count');
+                var n = source ? source.textContent.trim() : '';
+                if (n === '') return;
+                document.querySelectorAll('.cart_count, #cart-qty span, .mobilecart-qty, .js-cart-count').forEach(function (el) {
+                    el.textContent = n;
+                });
             })
             .catch(function () {});
     }

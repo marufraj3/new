@@ -1,82 +1,74 @@
 {{--
-    Reusable product card.
-    Usage:
-      @include('frontEnd.layouts.partials.product-card', ['product' => $p])
-      @include('frontEnd.layouts.partials.product-card', ['product' => $p, 'showSold' => true])
-
-    Quick actions (প্রতি কার্ডে ২টি):
-      1) Order Now  → দ্রুত অর্ডার পপআপ খোলে (.qo-order-link — quick-order-modal.js হ্যান্ডেল করে)
-      2) Cart Icon  → সরাসরি কার্টে যোগ করে (.addcartbutton — master.blade.php হ্যান্ডেল করে)
+    AVORONNO-style product card using this repository's existing actions.
+    The eye button, Order Now button and quick-order popup hooks are kept intact.
 --}}
 @php
-    $__img = isset($product->image) && $product->image ? asset($product->image->image) : asset('public/logo.png');
+    $__img = optional($product->image)->image ?? 'public/uploads/default/no-image.png';
     $__url = route('product', $product->slug);
-    $__rating = isset($product->reviews) && $product->reviews->count() ? (int) round($product->reviews->avg('ratting')) : 0;
-    $__reviewsCount = isset($product->reviews) ? $product->reviews->count() : 0;
-    $__off = (!empty($product->old_price) && $product->old_price > $product->new_price)
-        ? round((($product->old_price - $product->new_price) * 100) / $product->old_price) : 0;
-    $__variantRows = (isset($product->variantPrices) && $product->variantPrices->count()) ? $product->variantPrices : collect();
-    $__hasVariantStock = $__variantRows->contains(fn($v) => $v->stock !== null);
-    $__stock = $__hasVariantStock ? (int) $__variantRows->sum(fn($v) => max(0, (int) $v->stock)) : (int) ($product->stock ?? 0);
-    $__sold = (int) ($product->sold ?? 0);
-    $__showSold = $showSold ?? false;
+    $__price = (float) ($product->new_price ?? 0);
+    $__oldPrice = (float) ($product->old_price ?? 0);
+    $__off = $__oldPrice > $__price && $__price > 0
+        ? (int) round((($__oldPrice - $__price) / $__oldPrice) * 100)
+        : 0;
+    $__variantRows = (isset($product->variantPrices) && $product->variantPrices->count())
+        ? $product->variantPrices
+        : collect();
+    $__hasTrackedVariantStock = $__variantRows->contains(fn ($variant) => $variant->stock !== null);
+    $__stockWasLoaded = isset($product->stock) || (method_exists($product, 'getAttributes') && array_key_exists('stock', $product->getAttributes()));
+    $__stock = $__hasTrackedVariantStock
+        ? (int) $__variantRows->sum(fn ($variant) => max(0, (int) $variant->stock))
+        : ($__stockWasLoaded ? (int) $product->stock : 1);
+    $__hasOptions = (isset($product->prosizes) && $product->prosizes->isNotEmpty())
+        || (isset($product->procolors) && $product->procolors->isNotEmpty())
+        || $__variantRows->isNotEmpty();
 @endphp
 
-<article class="sf-card">
-    <div class="sf-card__media">
-        @if($__off > 0)<span class="sf-off-badge">-{{ $__off }}%</span>@endif
-        @if($__stock <= 0)
-            <span class="sf-badge sf-badge--plain" style="position:absolute;top:10px;right:10px;z-index:2;background:var(--c-text);color:#fff">Sold Out</span>
-        @elseif($__showSold && $__stock <= 20)
-            <span class="sf-badge sf-badge--amber" style="position:absolute;top:10px;right:10px;z-index:2">Only {{ $__stock }} left</span>
-        @endif
+<article class="product-card-v2 sf-card">
+    <div class="pc2-img-wrap">
         <a href="{{ $__url }}" aria-label="{{ $product->name }}">
-            <img src="{{ $__img }}" alt="{{ $product->name }}" loading="lazy" />
+            <img loading="lazy" src="{{ asset($__img) }}" alt="{{ $product->name }}" onerror="this.src='{{ asset('public/uploads/default/no-image.png') }}'">
         </a>
+
+        @if($__off > 0)
+            <span class="pc2-badge">-{{ $__off }}%</span>
+        @endif
+
         @if($__stock > 0)
-            <button type="button" class="sf-icon-btn sf-card__view quick_view" data-id="{{ $product->id }}" title="Quick view" aria-label="Quick view">
+            <button type="button" class="pc2-quick-view quick_view" data-id="{{ $product->id }}" title="Quick view" aria-label="Quick view">
                 <i class="fa-regular fa-eye"></i>
             </button>
-        @endif
-        @if($__stock <= 0)
-            <div class="sf-card__stockout"><span>Sold Out</span></div>
+        @else
+            <span class="pc2-stockout">Sold Out</span>
         @endif
     </div>
-    <div class="sf-card__body">
-        <a class="sf-card__name sf-clamp-2" href="{{ $__url }}">{{ $product->name }}</a>
-        <div class="sf-card__meta">
-            <span class="sf-stars">
-                @for($i = 1; $i <= 5; $i++)<i class="fa-solid fa-star {{ $i <= $__rating ? 'on' : '' }}"></i>@endfor
-            </span>
-            @if($__reviewsCount)<span>({{ $__reviewsCount }})</span>@endif
-            @if($__sold > 0)<span>{{ $__sold }}+ sold</span>@endif
+
+    <div class="pc2-info">
+        <h3 class="pc2-name"><a href="{{ $__url }}">{{ Str::limit($product->name, 45) }}</a></h3>
+
+        <div class="pc2-price-row">
+            <span class="pc2-price">৳{{ number_format($__price, 0) }}</span>
+            @if($__oldPrice > $__price)
+                <span class="pc2-prev-price">৳{{ number_format($__oldPrice, 0) }}</span>
+            @endif
         </div>
-        <div class="sf-card__price">
-            <span class="sf-price"><span class="cur">৳</span>{{ number_format((float) $product->new_price) }}</span>
-            @if($__off > 0)<span class="sf-old-price">৳{{ number_format((float) $product->old_price) }}</span>@endif
-        </div>
-        @if($__showSold)
-            @php $__pct = min(100, round($__sold * 100 / max($__sold + $__stock, 1))); @endphp
-            <div class="sf-card__sold-txt"><span>Sold: {{ $__sold }}</span><span>Left: {{ max($__stock, 0) }}</span></div>
-            <div class="sf-card__sold"><i style="width:{{ max($__pct, 4) }}%"></i></div>
-        @endif
-        <div class="sf-card__actions">
+
+        <div class="pc2-btn-group">
             @if($__stock > 0)
-                <button type="button" class="sf-btn sf-btn--primary sf-card__order qo-order-link" data-id="{{ $product->id }}" data-url="{{ $__url }}" aria-label="Order Now">
-                    <i class="fa-solid fa-bolt"></i> Order Now
-                </button>
-                {{-- ভ্যারিয়েন্ট (সাইজ/কালার) থাকলে কার্ট আইকনে ক্লিকে পপআপ খুলে অপশন নেবে; সাধারণ প্রোডাক্ট সরাসরি কার্টে যাবে --}}
-                @if($__variantRows->count())
-                    <button type="button" class="sf-icon-btn sf-card__cart qo-cart-link" data-id="{{ $product->id }}" data-url="{{ $__url }}" title="Add to cart" aria-label="Add to cart">
-                        <i class="fa-solid fa-cart-shopping"></i>
+                @if($__hasOptions)
+                    <button type="button" class="pc2-cart-btn pc2-outline-btn qo-cart-link" data-id="{{ $product->id }}" data-url="{{ $__url }}">
+                        <i class="fa-solid fa-cart-shopping"></i><span>কার্টে যোগ</span>
                     </button>
                 @else
-                    <button type="button" class="sf-icon-btn sf-card__cart addcartbutton" data-id="{{ $product->id }}" title="Add to cart" aria-label="Add to cart">
-                        <i class="fa-solid fa-cart-shopping"></i>
+                    <button type="button" class="pc2-cart-btn pc2-outline-btn addcartbutton" data-id="{{ $product->id }}">
+                        <i class="fa-solid fa-cart-shopping"></i><span>কার্টে যোগ</span>
                     </button>
                 @endif
+
+                <button type="button" class="pc2-cart-btn qo-order-link" data-id="{{ $product->id }}" data-url="{{ $__url }}">
+                    <i class="fa-solid fa-bolt"></i><span>Order Now</span>
+                </button>
             @else
-                <button type="button" class="sf-btn sf-btn--outline sf-card__order" disabled><i class="fa-solid fa-ban"></i> Sold Out</button>
+                <a href="{{ $__url }}" class="pc2-cart-btn pc2-disabled-btn"><i class="fa-solid fa-ban"></i> Sold Out</a>
             @endif
         </div>
     </div>
