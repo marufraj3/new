@@ -92,13 +92,69 @@ function build() {
 
   const nav = NAV;
 
+  /* ---------- quick-order popup demo data (window.CDP) ----------
+     Production-এ /quick-order/{id} endpoint থেকে ডাটা আসে। স্ট্যাটিক
+     প্রিভিউতে সেটা না-থাকায়, প্রতিটি পেজে product data embed করা হয়
+     যাতে "Order Now" ক্লিকে পপআপ রিয়েল ডাটা নিয়ে খুলে। ---------- */
+  function cdpFor(p) {
+    if (!p || p.id == null) return null;
+    const variants = Array.from(p.variantPrices || []).map(v => ({ s: v.size_id, c: v.color_id, p: v.price, st: v.stock }));
+    const prosizes = Array.from(p.prosizes || []);
+    const procolors = Array.from(p.procolors || []);
+    const sizes = {}, colors = {};
+    variants.forEach(v => {
+      if (v.s != null) {
+        if (!sizes[v.s]) {
+          const sz = prosizes.find(s => s.id === v.s);
+          sizes[v.s] = { id: v.s, name: sz ? sz.sizeName : 'S', stock: 0, has_stock: false };
+        }
+        if (v.st != null) { sizes[v.s].stock += Math.max(0, Number(v.st)); sizes[v.s].has_stock = true; }
+      }
+      if (v.c != null) {
+        const cl = procolors.find(c => c.id === v.c);
+        colors[v.c] = { id: v.c, name: cl ? cl.colorName : 'Color', hex: cl ? cl.color : '#cccccc' };
+      }
+    });
+    return {
+      id: p.id,
+      name: p.name,
+      img: (p.image && p.image.image) || '',
+      url: '/product/' + p.slug,
+      price: Number(p.new_price) || 0,
+      old: Number(p.old_price) || 0,
+      stock: Number(p.stock) || 0,
+      shipping: p.is_digital ? 0 : 60,
+      sizes: Object.values(sizes),
+      colors: Object.values(colors),
+      variants,
+    };
+  }
+  const allProds = [];
+  const seen = new Set();
+  const collect = (list) => {
+    const arr = Array.isArray(list) ? list : (list && typeof list[Symbol.iterator] === 'function' ? Array.from(list) : (list && Array.isArray(list.items) ? list.items : []));
+    arr.forEach(p => {
+      if (p && p.id != null && !seen.has(p.id)) { seen.add(p.id); allProds.push(p); }
+    });
+  };
+  collect(Object.values(data.prods || {}));
+  collect(data.all_products || []);
+  collect(data.flas_sales || []);
+  collect(data.hotdeal_top || []);
+  collect(data.hotdeal_bottom || []);
+  Array.from(data.homeproducts || []).forEach(sec => collect(sec.products || []));
+  Object.values(data.cat || {}).forEach(cat => collect(cat.products ? cat.products.items || [] : []));
+  const cdpEntries = allProds.map(cdpFor).filter(Boolean)
+    .map(p => `  window.CDP[${JSON.stringify(String(p.id))}] = ${JSON.stringify(p)};`).join('\n');
+  const CDP_SCRIPT = `<script>\n  window.CDP = window.CDP || {};\n${cdpEntries}\n</script>`;
+
   const indexLinks = pages.map(p => `<a class="card" href="${p.out}"><b>${p.out.replace('.html', '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</b><span>${p.title}</span></a>`).join('');
 
   for (const page of pages) {
     const compiler = new Compiler(data, page.query);
     try {
       let html = compiler.render(page.view, page.extra, page.query);
-      html = html.replace('</body>', nav + '\n</body>');
+      html = html.replace('</body>', CDP_SCRIPT + '\n' + nav + '\n</body>');
       fs.writeFileSync(path.join(OUT, page.out), html);
       console.log('✓', page.out, '(', Math.round(html.length / 1024), 'KB )');
     } catch (err) {

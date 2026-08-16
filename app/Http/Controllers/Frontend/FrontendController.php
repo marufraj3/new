@@ -456,7 +456,8 @@ $brands = Brand::where('status', 1)
     $products = Product::where('brand_id', $brand->id)
         ->where('status', 1)
         ->where('approval_status', 'approved')
-        ->select('id', 'name', 'slug', 'new_price', 'old_price', 'stock');
+        ->select('id', 'name', 'slug', 'new_price', 'old_price', 'stock')
+        ->with(['image', 'reviews', 'prosizes', 'procolors', 'variantPrices.color', 'variantPrices.size']);
 
     // sorting (same pattern as category/shop)
     if ($request->sort == 1) {
@@ -507,7 +508,7 @@ $brands = Brand::where('status', 1)
             ->where('status', 1)
             ->where('approval_status', 'approved')
             ->select('id', 'name', 'slug', 'new_price', 'old_price', 'stock', 'sold')
-            ->with(['image', 'reviews', 'prosizes', 'procolors']);
+            ->with(['image', 'reviews', 'prosizes', 'procolors', 'variantPrices.color', 'variantPrices.size']);
 
         // Sorting
         if ($request->sort == 1) {
@@ -646,7 +647,8 @@ $brands = Brand::where('status', 1)
     public function hotdeals(Request $request)
     {
         $products = Product::where(['status' => 1, 'approval_status' => 'approved', 'topsale' => 1])
-            ->select('id', 'name', 'slug', 'new_price', 'old_price','stock');
+            ->select('id', 'name', 'slug', 'new_price', 'old_price','stock')
+            ->with(['image', 'reviews', 'prosizes', 'procolors', 'variantPrices.color', 'variantPrices.size']);
 
         if ($request->sort == 1) {
             $products = $products->orderBy('created_at', 'desc');
@@ -729,7 +731,8 @@ $brands = Brand::where('status', 1)
     public function shop(Request $request)
     {
         $products = Product::where(['status' => 1, 'approval_status' => 'approved'])
-            ->select('id', 'name', 'slug', 'new_price', 'old_price','stock');
+            ->select('id', 'name', 'slug', 'new_price', 'old_price','stock')
+            ->with(['image', 'reviews', 'prosizes', 'procolors', 'variantPrices.color', 'variantPrices.size']);
 
         if ($request->sort == 1) {
             $products = $products->orderBy('created_at', 'desc');
@@ -763,7 +766,8 @@ $brands = Brand::where('status', 1)
     public function flashsales(Request $request)
     {
         $products = Product::where(['status' => 1, 'approval_status' => 'approved', 'flashsale' => 1])
-            ->select('id', 'name', 'slug', 'new_price', 'old_price','stock');
+            ->select('id', 'name', 'slug', 'new_price', 'old_price','stock')
+            ->with(['image', 'reviews', 'prosizes', 'procolors', 'variantPrices.color', 'variantPrices.size']);
 
         if ($request->sort == 1) {
             $products = $products->orderBy('created_at', 'desc');
@@ -797,7 +801,8 @@ $brands = Brand::where('status', 1)
         $category = Category::where(['slug' => $slug, 'status' => 1])->first();
 
         $products = Product::where(['status' => 1, 'approval_status' => 'approved', 'category_id' => $category->id])
-            ->select('id', 'name', 'slug', 'new_price', 'old_price', 'category_id','sold','stock');
+            ->select('id', 'name', 'slug', 'new_price', 'old_price', 'category_id','sold','stock')
+            ->with(['image', 'reviews', 'prosizes', 'procolors', 'variantPrices.color', 'variantPrices.size']);
         $subcategories = Subcategory::where('category_id', $category->id)->get();
 
         if ($request->sort == 1) {
@@ -839,7 +844,8 @@ $brands = Brand::where('status', 1)
         $soldShow = $request->sold=='show'?true:false;
         $subcategory = Subcategory::where(['slug' => $slug, 'status' => 1])->first();
         $products = Product::where(['status' => 1, 'approval_status' => 'approved', 'subcategory_id' => $subcategory->id])
-            ->select('id', 'name', 'slug', 'new_price', 'old_price', 'category_id', 'subcategory_id','sold','stock');
+            ->select('id', 'name', 'slug', 'new_price', 'old_price', 'category_id', 'subcategory_id','sold','stock')
+            ->with(['image', 'reviews', 'prosizes', 'procolors', 'variantPrices.color', 'variantPrices.size']);
         $childcategories = Childcategory::where('subcategory_id', $subcategory->id)->get();
 
         if ($request->sort == 1) {
@@ -887,7 +893,8 @@ $brands = Brand::where('status', 1)
         $soldShow = $request->sold=='show'?true:false;
         $childcategory = Childcategory::where(['slug' => $slug, 'status' => 1])->first();
         $childcategories = Childcategory::where('subcategory_id', $childcategory->subcategory_id)->get();
-        $products = Product::where(['status' => 1, 'approval_status' => 'approved', 'childcategory_id' => $childcategory->id])->with('category')
+        $products = Product::where(['status' => 1, 'approval_status' => 'approved', 'childcategory_id' => $childcategory->id])
+            ->with(['category', 'image', 'reviews', 'prosizes', 'procolors', 'variantPrices.color', 'variantPrices.size'])
             ->select('id', 'name', 'slug', 'new_price', 'old_price', 'category_id', 'subcategory_id', 'childcategory_id','sold','stock');
 
         if ($request->sort == 1) {
@@ -946,7 +953,7 @@ $brands = Brand::where('status', 1)
         $products = Product::where('category_id', $details->category_id)
             ->where('id', '!=', $details->id)
             ->where(['status' => 1, 'approval_status' => 'approved'])
-            ->with(['image', 'category', 'brand', 'reviews', 'prosizes', 'procolors'])
+            ->with(['image', 'category', 'brand', 'reviews', 'prosizes', 'procolors', 'variantPrices.color', 'variantPrices.size'])
             ->select('id', 'name', 'slug', 'new_price', 'old_price', 'stock', 'category_id', 'brand_id', 'pro_unit')
             ->limit(12)
             ->get();
@@ -1051,6 +1058,15 @@ $brands = Brand::where('status', 1)
         $sizes  = array_values($sizes);
         $colors = array_values($colors);
 
+        // পপআপের অর্ডার সামারিতে ডেলিভারি চার্জ দেখানোর জন্য ডিফল্ট শিপিং চার্জ
+        $shippingFee = 0;
+        if (!empty($p->is_digital)) {
+            $shippingFee = 0;
+        } else {
+            $firstCharge = \App\Models\ShippingCharge::where('status', 1)->first();
+            $shippingFee = $firstCharge ? (float) $firstCharge->amount : 0;
+        }
+
         return response()->json([
             'id'       => $p->id,
             'name'     => $p->name,
@@ -1062,7 +1078,58 @@ $brands = Brand::where('status', 1)
             'sizes'    => $sizes,
             'colors'   => $colors,
             'variants' => $variants,
+            'shipping' => $shippingFee,
         ]);
+    }
+
+    /**
+     * 🔥 কুইক-অর্ডার অর্ডার প্লেসমেন্ট (পপআপ থেকেই অর্ডার কমপ্লিট)
+     *
+     * Product Card → Order Now → সাইজ/পরিমাণ → কাস্টমার তথ্য → Confirm
+     * পুরো ফ্লো পপআপেই শেষ হয়; চেকআউট পেজে যেতে হয় না। অর্ডার তৈরি হয়
+     * normal checkout-এর মতোই (QuickOrderService দেখুন)।
+     */
+    public function quickOrderPlace(Request $request)
+    {
+        $request->validate([
+            'id'            => 'required|integer',
+            'qty'           => 'required|integer|min:1',
+            'product_size'  => 'nullable|integer',
+            'product_color' => 'nullable|integer',
+            'name'          => 'required|string|max:100',
+            'phone'         => 'required|string|max:20',
+            'address'       => 'required|string|max:500',
+            'note'          => 'nullable|string|max:500',
+        ]);
+
+        try {
+            $order = app(\App\Services\QuickOrderService::class)->placeOrder([
+                'product_id'  => $request->id,
+                'qty'         => $request->qty,
+                'size_id'     => $request->product_size,
+                'color_id'    => $request->product_color,
+                'name'        => trim($request->name),
+                'phone'       => trim($request->phone),
+                'address'     => trim($request->address),
+                'note'        => trim($request->note ?? ''),
+            ], $request);
+
+            return response()->json([
+                'success'    => true,
+                'message'    => 'অর্ডারটি সফলভাবে গ্রহণ করা হয়েছে!',
+                'invoice_id' => $order->invoice_id,
+                'order_id'   => $order->id,
+                'amount'     => (float) $order->amount,
+                'order_url'  => route('customer.order_success', $order->id),
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['success' => false, 'message' => 'সব ঘর সঠিকভাবে পূরণ করুন।'], 422);
+        } catch (\RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            \Log::error('Quick order failed: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            return response()->json(['success' => false, 'message' => 'অর্ডারটি করা যায়নি। আবার চেষ্টা করুন।'], 500);
+        }
     }
 
     public function livesearch(Request $request)
@@ -1070,7 +1137,7 @@ $brands = Brand::where('status', 1)
         $products = Product::select('id', 'name', 'slug', 'new_price', 'old_price','stock')
             ->where('status', 1)
             ->where('approval_status', 'approved')
-            ->with('image');
+            ->with(['image', 'reviews', 'prosizes', 'procolors', 'variantPrices.color', 'variantPrices.size']);
         if ($request->keyword) {
             $products = $products->where('name', 'LIKE', '%' . $request->keyword . "%");
         }
@@ -1090,7 +1157,7 @@ $brands = Brand::where('status', 1)
         $products = Product::select('id', 'name', 'slug', 'new_price', 'old_price','stock')
             ->where('status', 1)
             ->where('approval_status', 'approved')
-            ->with('image');
+            ->with(['image', 'reviews', 'prosizes', 'procolors', 'variantPrices.color', 'variantPrices.size']);
         if ($request->keyword) {
             $products = $products->where('name', 'LIKE', '%' . $request->keyword . "%");
         }

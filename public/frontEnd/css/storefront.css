@@ -420,10 +420,19 @@ p{margin:0}
 .sf-card:hover .sf-card__media img{transform:scale(1.06)}
 .sf-card__media .sf-off-badge{top:10px;left:10px}
 .sf-card__media .sf-badge--green{position:absolute;top:10px;right:10px;z-index:2}
-.sf-card__hover{position:absolute;left:10px;right:10px;bottom:10px;display:flex;gap:8px;opacity:0;transform:translateY(8px);transition:.25s;z-index:3}
-.sf-card:hover .sf-card__hover{opacity:1;transform:translateY(0)}
-.sf-card__hover .sf-btn{flex:1;padding:10px 8px;font-size:12.5px}
-.sf-card__hover .sf-icon-btn{width:40px;height:40px;flex:0 0 40px;font-size:14px}
+/* Quick view corner (hover on desktop, always visible on touch) */
+.sf-card__view{position:absolute;bottom:10px;right:10px;z-index:3;background:rgba(255,255,255,.94);width:36px;height:36px;border-radius:50%;box-shadow:var(--sh-sm);opacity:0;transform:translateY(4px);transition:.22s;border:1px solid var(--c-line)}
+.sf-card:hover .sf-card__view{opacity:1;transform:translateY(0)}
+.sf-card__view:hover{background:var(--c-primary);color:#fff;border-color:var(--c-primary)}
+/* Quick actions row: Order Now + Cart icon */
+.sf-card__actions{display:flex;align-items:stretch;gap:8px;margin-top:auto;padding-top:4px}
+.sf-card__order{flex:1;padding:10px 12px;font-size:13px;justify-content:center}
+.sf-card__order i{font-size:12px}
+.sf-card__cart{flex:0 0 42px;width:42px;height:42px;border-radius:var(--r-sm);border:1.5px solid var(--c-primary);background:#fff;color:var(--c-primary);font-size:15px;transition:.2s}
+.sf-card__cart:hover{background:var(--c-primary);color:#fff;border-color:var(--c-primary);transform:translateY(-1px)}
+@media (hover:none){
+  .sf-card__view{opacity:1;transform:none}
+}
 .sf-card__body{padding:12px 13px 14px;display:flex;flex-direction:column;gap:7px;flex:1}
 .sf-card__name{font-size:13.5px;font-weight:600;color:var(--c-text);line-height:1.45}
 .sf-card__name:hover{color:var(--c-accent)}

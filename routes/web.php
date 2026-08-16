@@ -501,6 +501,7 @@ Route::group(['namespace'=>'Frontend', 'middleware' => ['ipcheck','check_refer']
     Route::get('product/{id}', [FrontendController::class, 'details'])->name('product');    
     Route::get('quick-view', [FrontendController::class, 'quickview'])->name('quickview');
     Route::get('quick-order/{id}', [FrontendController::class, 'quickOrderData'])->name('quick.order.data');
+    Route::post('quick-order/place', [FrontendController::class, 'quickOrderPlace'])->name('quick.order.place');
     Route::get('/shipping-charge', [FrontendController::class, 'shipping_charge'])->name('shipping.charge');
     Route::get('/page/{slug}', [FrontendController::class, 'page'])->name('page');
     Route::get('districts', [FrontendController::class, 'districts'])->name('districts');

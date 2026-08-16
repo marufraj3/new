@@ -21,9 +21,10 @@
     <link rel="stylesheet" href="{{ asset('public/frontEnd/css/owl.carousel.min.css') }}" />
     <link rel="stylesheet" href="{{ asset('public/frontEnd/css/owl.theme.default.min.css') }}" />
     <link rel="stylesheet" href="{{ asset('public/frontEnd/css/select2.min.css') }}" />
+    <link rel="stylesheet" href="{{ asset('public/frontEnd/css/news-ticker.css') }}" />
     <link rel="stylesheet" href="{{ asset('public/backEnd/assets/css/toastr.min.css') }}" />
     {{-- ===== STOREFRONT DESIGN SYSTEM (overrides everything) ===== --}}
-    <link rel="stylesheet" href="{{ asset('public/frontEnd/css/storefront.css') }}?v=3" />
+    <link rel="stylesheet" href="{{ asset('public/frontEnd/css/storefront.css') }}?v=4" />
 
     <style>
         :root{
@@ -79,6 +80,9 @@
     @php $gtm_noscript_id = preg_match('/^GTM-/i', trim($gtm->code)) ? trim($gtm->code) : 'GTM-'.trim($gtm->code); @endphp
     <noscript><iframe src="https://www.googletagmanager.com/ns.html?id={{ $gtm_noscript_id }}" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 @endforeach
+
+{{-- Special Notice marquee (admin-controlled top_headline + news_ticker_enabled) --}}
+@include('frontEnd.layouts.partials.breaking-news-ticker')
 
 @php
     $cartCount = Cart::instance('shopping')->count();
@@ -189,10 +193,6 @@
             <div class="sf-topbar__grp">
                 @if(!empty(optional($contact)->hotline))
                     <a class="sf-topbar__hot" href="tel:{{ $contact->hotline }}"><i class="fa-solid fa-phone"></i> Hotline: {{ $contact->hotline }}</a>
-                @endif
-                @if(!empty(optional($generalsetting)->top_headline))
-                    <span class="sf-hide-mobile" style="display:none">·</span>
-                    <a href="{{ route('shop') }}" class="sf-hide-mobile"><i class="fa-solid fa-bullhorn"></i> {{ Str::limit(strip_tags(optional($generalsetting)->top_headline), 70) }}</a>
                 @endif
             </div>
             <div class="sf-topbar__grp">

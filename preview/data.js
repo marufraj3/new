@@ -15,6 +15,12 @@ const generalsetting = {
   footer_color: '#141c36',
   copyright_color: '#10172e',
   top_headline: 'Free delivery on orders over ৳1,000 — today only!',
+  news_ticker_enabled: 1,
+  quick_order_popup_enabled: 1,
+  quick_order_popup_title: '🛒 দ্রুত অর্ডার করুন',
+  quick_order_confirm_text: 'অর্ডার কনফার্ম করুন →',
+  quick_order_cart_text: 'কার্টে রাখুন',
+  quick_order_cart_toast: 'কার্টে যোগ হয়েছে ✔',
   flash_sale_end_date: '2027-11-09',
   hot_deal_end_date: '2027-11-10',
   show_all_products: 1,
@@ -109,7 +115,16 @@ const prod = (opts) => {
   const old = opts.old_price || 0;
   const sizesSel = (opts.sizes || []).map(id => sizes[id]);
   const colorsSel = (opts.colors || []).map(id => colors[id]);
-  const variantPrices = C((opts.variants || (sizesSel.length || colorsSel.length ? [{ s: opts.sizes?.[0] || null, c: opts.colors?.[0] || null, p: opts.new_price, st: opts.stock }] : [])).map(v => ({
+  /* সাইজ/কালার থাকলে সব কম্বিনেশনের ভ্যারিয়েন্ট অটো-জেনারেট (quick-order পপআপ ও details পেজের জন্য) */
+  const autoVariants = () => {
+    if (sizesSel.length && colorsSel.length) {
+      return sizesSel.flatMap(s => colorsSel.map(c => ({ s: s.id, c: c.id, p: opts.new_price, st: opts.stock })));
+    }
+    if (sizesSel.length) return sizesSel.map(s => ({ s: s.id, c: null, p: opts.new_price, st: opts.stock }));
+    if (colorsSel.length) return colorsSel.map(c => ({ s: null, c: c.id, p: opts.new_price, st: opts.stock }));
+    return [];
+  };
+  const variantPrices = C((opts.variants || autoVariants()).map(v => ({
     size_id: v.s, color_id: v.c, price: v.p, stock: v.st,
     size: v.s ? sizes[v.s] : null, color: v.c ? colors[v.c] : null,
   })));

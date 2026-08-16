@@ -3,6 +3,10 @@
     Usage:
       @include('frontEnd.layouts.partials.product-card', ['product' => $p])
       @include('frontEnd.layouts.partials.product-card', ['product' => $p, 'showSold' => true])
+
+    Quick actions (প্রতি কার্ডে ২টি):
+      1) Order Now  → দ্রুত অর্ডার পপআপ খোলে (.qo-order-link — quick-order-modal.js হ্যান্ডেল করে)
+      2) Cart Icon  → সরাসরি কার্টে যোগ করে (.addcartbutton — master.blade.php হ্যান্ডেল করে)
 --}}
 @php
     $__img = isset($product->image) && $product->image ? asset($product->image->image) : asset('public/logo.png');
@@ -15,6 +19,7 @@
     $__hasVariantStock = $__variantRows->contains(fn($v) => $v->stock !== null);
     $__stock = $__hasVariantStock ? (int) $__variantRows->sum(fn($v) => max(0, (int) $v->stock)) : (int) ($product->stock ?? 0);
     $__sold = (int) ($product->sold ?? 0);
+    $__showSold = $showSold ?? false;
 @endphp
 
 <article class="sf-card">
@@ -22,22 +27,17 @@
         @if($__off > 0)<span class="sf-off-badge">-{{ $__off }}%</span>@endif
         @if($__stock <= 0)
             <span class="sf-badge sf-badge--plain" style="position:absolute;top:10px;right:10px;z-index:2;background:var(--c-text);color:#fff">Sold Out</span>
-        @elseif(($showSold ?? false) && $__stock <= 20)
+        @elseif($__showSold && $__stock <= 20)
             <span class="sf-badge sf-badge--amber" style="position:absolute;top:10px;right:10px;z-index:2">Only {{ $__stock }} left</span>
         @endif
         <a href="{{ $__url }}" aria-label="{{ $product->name }}">
             <img src="{{ $__img }}" alt="{{ $product->name }}" loading="lazy" />
         </a>
-        <div class="sf-card__hover">
-            <button type="button" class="sf-icon-btn quick_view" data-id="{{ $product->id }}" title="Quick view" aria-label="Quick view">
+        @if($__stock > 0)
+            <button type="button" class="sf-icon-btn sf-card__view quick_view" data-id="{{ $product->id }}" title="Quick view" aria-label="Quick view">
                 <i class="fa-regular fa-eye"></i>
             </button>
-            @if($__stock > 0)
-                <button type="button" class="sf-btn sf-btn--dark addcartbutton" data-id="{{ $product->id }}" aria-label="Add to cart">
-                    <i class="fa-solid fa-cart-plus"></i> Cart
-                </button>
-            @endif
-        </div>
+        @endif
         @if($__stock <= 0)
             <div class="sf-card__stockout"><span>Sold Out</span></div>
         @endif
@@ -55,10 +55,29 @@
             <span class="sf-price"><span class="cur">৳</span>{{ number_format((float) $product->new_price) }}</span>
             @if($__off > 0)<span class="sf-old-price">৳{{ number_format((float) $product->old_price) }}</span>@endif
         </div>
-        @if($showSold ?? false)
+        @if($__showSold)
             @php $__pct = min(100, round($__sold * 100 / max($__sold + $__stock, 1))); @endphp
             <div class="sf-card__sold-txt"><span>Sold: {{ $__sold }}</span><span>Left: {{ max($__stock, 0) }}</span></div>
             <div class="sf-card__sold"><i style="width:{{ max($__pct, 4) }}%"></i></div>
         @endif
+        <div class="sf-card__actions">
+            @if($__stock > 0)
+                <button type="button" class="sf-btn sf-btn--primary sf-card__order qo-order-link" data-id="{{ $product->id }}" data-url="{{ $__url }}" aria-label="Order Now">
+                    <i class="fa-solid fa-bolt"></i> Order Now
+                </button>
+                {{-- ভ্যারিয়েন্ট (সাইজ/কালার) থাকলে কার্ট আইকনে ক্লিকে পপআপ খুলে অপশন নেবে; সাধারণ প্রোডাক্ট সরাসরি কার্টে যাবে --}}
+                @if($__variantRows->count())
+                    <button type="button" class="sf-icon-btn sf-card__cart qo-cart-link" data-id="{{ $product->id }}" data-url="{{ $__url }}" title="Add to cart" aria-label="Add to cart">
+                        <i class="fa-solid fa-cart-shopping"></i>
+                    </button>
+                @else
+                    <button type="button" class="sf-icon-btn sf-card__cart addcartbutton" data-id="{{ $product->id }}" title="Add to cart" aria-label="Add to cart">
+                        <i class="fa-solid fa-cart-shopping"></i>
+                    </button>
+                @endif
+            @else
+                <button type="button" class="sf-btn sf-btn--outline sf-card__order" disabled><i class="fa-solid fa-ban"></i> Sold Out</button>
+            @endif
+        </div>
     </div>
 </article>
