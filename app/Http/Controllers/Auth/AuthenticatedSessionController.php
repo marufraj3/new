@@ -34,14 +34,19 @@ class AuthenticatedSessionController extends Controller
 
         $user = Auth::guard('admin')->user();
 
-        // Check if user role is 'reseller', redirect to reseller dashboard
-        // Check both Spatie role and direct role column
-        $isReseller = $user->hasRole('reseller') || 
-                      (isset($user->role) && strtolower($user->role) === 'reseller') ||
-                      $user->getRoleNames()->contains('reseller');
-        
-        if ($isReseller) {
-            return redirect()->route('reseller.dashboard');
+        // Historical reseller accounts are preserved in the database but the module is retired.
+        $isRetiredReseller = $user->hasRole('reseller')
+            || (isset($user->role) && strtolower($user->role) === 'reseller')
+            || $user->getRoleNames()->contains(fn ($role) => strtolower($role) === 'reseller');
+
+        if ($isRetiredReseller) {
+            Auth::guard('admin')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return redirect()->route('login')->withErrors([
+                'email' => 'The reseller portal is no longer available.',
+            ]);
         }
 
         // Otherwise, redirect to default dashboard

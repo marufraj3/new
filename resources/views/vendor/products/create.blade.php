@@ -437,11 +437,6 @@
                             <input type="text" class="form-control fw-bold text-success fs-5" name="new_price" value="{{ old('new_price') }}" id="new_price" placeholder="0" />
                         </div>
 
-                        <div class="mb-3">
-                            <label for="reseller_price" class="form-label">Reseller Price</label>
-                            <input type="text" step="0.01" class="form-control" name="reseller_price" value="{{ old('reseller_price') }}" id="reseller_price" placeholder="Reseller price (optional)" />
-                            <small class="text-muted">Special price for resellers. Leave empty if not applicable.</small>
-                        </div>
 
                         <div class="row g-2 mb-3">
                             <div class="col-6">

@@ -101,14 +101,6 @@ class GeminiService
                     $pendingVendors = DB::table('vendors')->where('verification_status', 'pending')->count();
                 } catch (\Exception $e) {}
 
-                // Resellers
-                $resellers = 0;
-                $pendingResellers = 0;
-                try {
-                    $resellers = DB::table('users')->where('role', 'reseller')->count();
-                    $pendingResellers = DB::table('users')->where('role', 'reseller')->where('verification_status', 'pending')->count();
-                } catch (\Exception $e) {}
-
                 // Reviews
                 $pendingReviews = 0;
                 try {
@@ -153,8 +145,6 @@ class GeminiService
                         'users' => $users,
                         'vendors' => $vendors,
                         'pending_vendors' => $pendingVendors,
-                        'resellers' => $resellers,
-                        'pending_resellers' => $pendingResellers,
                         'pending_reviews' => $pendingReviews,
                         'incomplete_orders' => $incompleteOrders,
                         'fund_balance_approx' => $fundBalance,
@@ -193,7 +183,6 @@ class GeminiService
         $text .= "- Orders: /admin/order/all, pending etc\n";
         $text .= "- Products: Inhouse, Vendor, Pending, Wholesale\n";
         $text .= "- Vendor Verification: /admin/vendor-verifications\n";
-        $text .= "- Reseller Verification: /admin/reseller-verifications\n";
         $text .= "- Fraud Check: /admin/manual-fraud-check\n";
         $text .= "- Settings: General, Site, API Integration, Email, etc\n";
         $text .= "- Fund/Account, Expenses, Purchases, Suppliers\n";

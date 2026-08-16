@@ -51,10 +51,9 @@
                 </div>
             </div>
 
-            {{-- Optional: join as seller/reseller --}}
+            {{-- Optional: open a vendor shop --}}
             <div style="border:1px dashed var(--c-line);border-radius:var(--r-md);padding:14px 16px;margin-bottom:16px">
                 <label class="sf-check" style="font-weight:700;color:var(--c-text)"><input type="checkbox" name="is_seller" value="1" id="regIsSeller" /> I want to register as a <b>Seller</b> (open my own shop)</label>
-                <label class="sf-check" style="margin-top:10px;font-weight:700;color:var(--c-text)"><input type="checkbox" name="is_reseller" value="1" id="regIsReseller" /> I want to register as a <b>Reseller</b></label>
 
                 <div id="regSellerBlock" style="display:none;margin-top:14px">
                     <div class="sf-field"><label>Shop Name <span class="req">*</span></label>
@@ -67,16 +66,6 @@
                         <input type="file" name="banner" class="sf-input" accept="image/*" /></div>
                 </div>
 
-                <div id="regResellerBlock" style="display:none;margin-top:14px">
-                    <div class="sf-field"><label>Reseller Shop Name</label>
-                        <input type="text" name="reseller_shop_name" class="sf-input" value="{{ old('reseller_shop_name') }}" placeholder="My Reseller Shop" /></div>
-                    <div class="sf-field"><label>Voter ID (Front)</label>
-                        <input type="file" name="voter_id_front" class="sf-input" accept="image/*" /></div>
-                    <div class="sf-field"><label>Voter ID (Back)</label>
-                        <input type="file" name="voter_id_back" class="sf-input" accept="image/*" /></div>
-                    <div class="sf-field"><label>Self Photo</label>
-                        <input type="file" name="self_image" class="sf-input" accept="image/*" /></div>
-                </div>
             </div>
 
             <button type="submit" class="sf-btn sf-btn--primary sf-btn--lg sf-btn--block"><i class="fa-solid fa-user-plus"></i> Create Account</button>
@@ -90,6 +79,5 @@
 @push('script')
 <script>
     $('#regIsSeller').on('change', function () { $('#regSellerBlock').toggle(this.checked); });
-    $('#regIsReseller').on('change', function () { $('#regResellerBlock').toggle(this.checked); });
 </script>
 @endpush

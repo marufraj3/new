@@ -520,15 +520,6 @@
                             </div>
                         </div>
 
-                        <div class="form-group mb-3">
-                            <label for="reseller_price" class="form-label">Reseller Price</label>
-                            <input type="text" step="0.01" class="form-control @error('reseller_price') is-invalid @enderror"
-                                   name="reseller_price" value="{{ old('reseller_price', $edit_data->reseller_price) }}" id="reseller_price" placeholder="Reseller price (optional)" />
-                            <small class="text-muted">Special price for resellers. Leave empty if not applicable.</small>
-                            @error('reseller_price')
-                            <span class="invalid-feedback" role="alert"><strong>{{ $message }}</strong></span>
-                            @enderror
-                        </div>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">

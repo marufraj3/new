@@ -609,19 +609,37 @@ $brands = Brand::where('status', 1)
 
             $firstItem = collect($items)->first();
 
-            // একই ফোন নম্বরের জন্য একটাই সারি — নয়তো প্রতি keystroke-এ নতুন
-            // রেকর্ড তৈরি হয়ে অ্যাডমিন লিস্ট ভরে যায়।
-            $incomplete = IncompleteOrder::updateOrCreate(
-                ['phone' => $phone],
-                [
-                    'name'          => $validated['name'] ?? null,
-                    'address'       => $validated['address'] ?? null,
-                    'items'         => $items,
-                    'product_image' => $validated['product_image'] ?? ($firstItem['image'] ?? null),
-                    'product_link'  => $validated['product_link'] ?? ($firstItem['link'] ?? null),
-                    'total_amount'  => $total,
-                ]
-            );
+            // Keep one evolving lead per phone and campaign, rather than creating a row
+            // on every keystroke. Different campaign variants remain independently measurable.
+            $campaignId = Session::get('active_campaign_id');
+            $userAgent = mb_substr((string) $request->userAgent(), 0, 2000);
+            [$deviceType, $deviceName] = $this->detectCheckoutDevice($userAgent);
+
+            // The server owns IP/device metadata. Never trust a browser-supplied IP.
+            // Keep the first checkout-entry timestamp while refreshing last activity.
+            $incomplete = IncompleteOrder::firstOrNew([
+                'phone' => $phone,
+                'campaign_id' => $campaignId,
+            ]);
+            if (!$incomplete->exists || !$incomplete->checkout_started_at) {
+                $incomplete->checkout_started_at = now();
+            }
+            $incomplete->fill([
+                'name'          => $validated['name'] ?? null,
+                'address'       => $validated['address'] ?? null,
+                'items'         => $items,
+                'product_image' => $validated['product_image'] ?? ($firstItem['image'] ?? null),
+                'product_link'  => $validated['product_link'] ?? ($firstItem['link'] ?? null),
+                'total_amount'  => $total,
+                'campaign_id'   => $campaignId,
+                'source'        => $validated['source'] ?? 'checkout',
+                'device_type'   => $deviceType,
+                'device_name'   => $deviceName,
+                'ip_address'    => $request->ip(),
+                'user_agent'    => $userAgent,
+                'last_activity_at' => now(),
+            ]);
+            $incomplete->save();
 
             return response()->json([
                 'status'  => 'success',
@@ -642,6 +660,34 @@ $brands = Brand::where('status', 1)
                 'message' => 'Failed to save incomplete order.',
             ], 500);
         }
+    }
+
+    /** @return array{0:string,1:string} */
+    private function detectCheckoutDevice(string $userAgent): array
+    {
+        $type = preg_match('/tablet|ipad|playbook|silk|android(?!.*mobile)/i', $userAgent)
+            ? 'tablet'
+            : (preg_match('/mobile|iphone|ipod|android.*mobile|windows phone/i', $userAgent) ? 'mobile' : 'desktop');
+
+        $platform = match (true) {
+            preg_match('/iphone|ipad|ipod/i', $userAgent) === 1 => 'iOS',
+            preg_match('/android/i', $userAgent) === 1 => 'Android',
+            preg_match('/windows/i', $userAgent) === 1 => 'Windows',
+            preg_match('/macintosh|mac os x/i', $userAgent) === 1 => 'macOS',
+            preg_match('/linux/i', $userAgent) === 1 => 'Linux',
+            default => 'Unknown OS',
+        };
+
+        $browser = match (true) {
+            preg_match('/edg\//i', $userAgent) === 1 => 'Edge',
+            preg_match('/opr\//i', $userAgent) === 1 => 'Opera',
+            preg_match('/chrome\//i', $userAgent) === 1 => 'Chrome',
+            preg_match('/safari\//i', $userAgent) === 1 => 'Safari',
+            preg_match('/firefox\//i', $userAgent) === 1 => 'Firefox',
+            default => 'Unknown browser',
+        };
+
+        return [$type, $platform . ' · ' . $browser];
     }
 
     public function hotdeals(Request $request)
@@ -1240,6 +1286,8 @@ $brands = Brand::where('status', 1)
     {
         $campaign_data = Campaign::with('images')
             ->where('slug', $slug)
+            ->where('status', true)
+            ->where('is_published', true)
             ->firstOrFail();
 
         // Keep the primary product first, then all pivot products in a deterministic order.
@@ -1367,12 +1415,32 @@ $brands = Brand::where('status', 1)
             'orderBumps'
         );
 
-        // Page builder দিয়ে ডিজাইন করা থাকলে আলাদা ভিউ
-        if (!empty($campaign_data->page_html)) {
+        // Published custom source has priority, followed by the visual builder. Campaigns
+        // without either use the new premium conversion template based on the supplied design.
+        if ($campaign_data->isCustomPageLive()) {
+            $viewData['renderPageHtml'] = app(\App\Services\CampaignCustomPageService::class)
+                ->render($campaign_data->custom_html, $campaign_data, $products);
+            $viewData['renderPageCss'] = $campaign_data->custom_css;
+            $viewData['renderPageJs'] = $campaign_data->custom_js;
+            $viewData['pageType'] = 'custom';
+
             return view('frontEnd.layouts.pages.campaign.campaign-builder', $viewData);
         }
 
-        return view('frontEnd.layouts.pages.campaign.campaign', $viewData);
+        if (!empty($campaign_data->page_html)) {
+            $viewData['pageType'] = 'visual';
+            return view('frontEnd.layouts.pages.campaign.campaign-builder', $viewData);
+        }
+
+        $viewData['renderPageHtml'] = view(
+            'frontEnd.layouts.pages.campaign.partials.premium-template',
+            $viewData
+        )->render();
+        $viewData['renderPageCss'] = null;
+        $viewData['renderPageJs'] = null;
+        $viewData['pageType'] = 'premium';
+
+        return view('frontEnd.layouts.pages.campaign.campaign-builder', $viewData);
     }
 
     public function payment_success(Request $request)

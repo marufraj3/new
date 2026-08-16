@@ -70,6 +70,13 @@
     .btn-edit:hover { background-color: rgba(114, 124, 245, 0.1); color: #727cf5; }
     .btn-delete:hover { background-color: rgba(250, 92, 124, 0.1); color: #fa5c7c; }
     .builder-status { display: inline-flex; width: fit-content; margin-top: 5px; padding: 3px 8px; border-radius: 999px; color: #6d28d9; background: #f3e8ff; font-size: 10px; font-weight: 700; }
+    .publish-status { display:inline-flex; width:fit-content; margin-top:5px; padding:3px 8px; border-radius:999px; font-size:10px; font-weight:800; }
+    .publish-live { color:#166534; background:#dcfce7; }
+    .publish-off { color:#991b1b; background:#fee2e2; }
+    .btn-code { color:#0369a1; background:#e0f2fe; }
+    .btn-code:hover { color:#fff; background:#0284c7; }
+    .btn-copy { color:#92400e; background:#fef3c7; }
+    .btn-copy:hover { color:#fff; background:#d97706; }
 </style>
 @endsection
 
@@ -114,9 +121,16 @@
                                         <a href="{{url('campaign',$value->slug)}}" target="_blank" class="campaign-link">
                                             <i class="fe-external-link me-1"></i> {{url('campaign',$value->slug)}}
                                         </a>
-                                        @if(!empty($value->page_html))
+                                        @if($value->custom_page_published_at && $value->custom_html)
+                                            <span class="builder-status"><i class="fe-code me-1"></i> Custom code design</span>
+                                        @elseif(!empty($value->page_html))
                                             <span class="builder-status"><i class="fe-layout me-1"></i> Visual design active</span>
+                                        @else
+                                            <span class="builder-status"><i class="fe-zap me-1"></i> Premium template</span>
                                         @endif
+                                        <span class="publish-status {{ $value->is_published && $value->status ? 'publish-live' : 'publish-off' }}">
+                                            {{ $value->is_published && $value->status ? '● Published' : '● Unpublished' }}
+                                        </span>
                                     </div>
                                 </td>
 
@@ -150,19 +164,46 @@
 
                                         
                                         {{-- View Live --}}
-                                        <a href="{{url('campaign',$value->slug)}}" target="_blank" class="action-btn btn-view" title="View Live">
-                                            <i class="fe-eye"></i>
-                                        </a>
+                                        @if($value->is_published && $value->status)
+                                            <a href="{{url('campaign',$value->slug)}}" target="_blank" class="action-btn btn-view" title="View Live">
+                                                <i class="fe-eye"></i>
+                                            </a>
+                                        @endif
 
                                         {{-- Elementor-style visual builder --}}
                                         <a href="{{ route('campaign.builder', $value->id) }}" class="action-btn btn-builder" title="Open Visual Builder">
                                             <i class="fe-layout"></i>
                                         </a>
 
+                                        {{-- Raw HTML/CSS/JavaScript builder --}}
+                                        <a href="{{ route('campaign.custom-builder', $value->id) }}" class="action-btn btn-code" title="Custom Code Builder">
+                                            <i class="fe-code"></i>
+                                        </a>
+
+                                        {{-- One-click complete campaign duplication --}}
+                                        <form method="post" action="{{ route('campaign.duplicate', $value->id) }}" class="d-inline" onsubmit="return confirm('Duplicate this campaign and all of its content?');">
+                                            @csrf
+                                            <button type="submit" class="action-btn btn-copy" title="Duplicate Campaign"><i class="fe-copy"></i></button>
+                                        </form>
+
                                         {{-- Edit campaign settings and products --}}
                                         <a href="{{route('campaign.edit',$value->id)}}" class="action-btn btn-edit" title="Edit Campaign Settings">
                                             <i class="fe-edit"></i>
                                         </a>
+
+                                        {{-- Publication state --}}
+                                        @if($value->is_published && $value->status)
+                                            <form method="post" action="{{ route('campaign.unpublish', $value->id) }}" class="d-inline" onsubmit="return confirm('Unpublish this page?');">
+                                                @csrf
+                                                <button type="submit" class="action-btn btn-delete" title="Unpublish"><i class="fe-eye-off"></i></button>
+                                            </form>
+                                        @else
+                                            <form method="post" action="{{ route('campaign.active') }}" class="d-inline">
+                                                @csrf
+                                                <input type="hidden" name="hidden_id" value="{{ $value->id }}">
+                                                <button type="submit" class="action-btn btn-view" title="Publish"><i class="fe-upload-cloud"></i></button>
+                                            </form>
+                                        @endif
 
                                         {{-- Delete --}}
                                         <form method="post" action="{{ route('campaign.destroy') }}" class="d-inline">

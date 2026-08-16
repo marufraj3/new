@@ -38,9 +38,12 @@ class AdminMiddleware
         // ✅ Blocklist: শুধু vendor এবং reseller (customer allow)
         $blockedSpatieRoles = ['vendor', 'reseller'];
         
-        // Check if user has reseller Spatie role
+        // Retired reseller accounts remain stored but cannot enter any runtime panel.
         if (in_array('reseller', $spatieRoles)) {
-            return redirect()->route('reseller.dashboard')->with('error', 'You do not have permission to access admin panel.');
+            Auth::guard('admin')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+            return redirect()->route('login')->with('error', 'The reseller portal is no longer available.');
         }
 
         // Check if user has vendor Spatie role

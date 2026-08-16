@@ -110,13 +110,13 @@
 
 @foreach($orders as $order)
 @php
-    $isReseller  = !empty($order->customer_payable_amount);
+    $hasLegacyPayableAmount  = !empty($order->customer_payable_amount);
     $subtotal    = 0;
     foreach ($order->orderdetails as $od) { $subtotal += ($od->sale_price * $od->qty); }
-    if ($isReseller && $order->customer_payable_amount) {
+    if ($hasLegacyPayableAmount && $order->customer_payable_amount) {
         $subtotal = $order->customer_payable_amount - $order->shipping_charge;
     }
-    $finalTotal  = $isReseller ? $order->customer_payable_amount : $order->amount;
+    $finalTotal  = $hasLegacyPayableAmount ? $order->customer_payable_amount : $order->amount;
     $totalQty    = $order->orderdetails->sum('qty');
     $payMethod   = strtoupper($order->payment_gateway ?? ($order->payment ? $order->payment->payment_method : 'N/A'));
     $payStatus   = $order->payment_status ?? ($order->payment ? $order->payment->payment_status : 'pending');
@@ -169,7 +169,7 @@
         <tbody>
             @foreach($order->orderdetails as $item)
             @php
-                if ($isReseller && $order->customer_payable_amount && $subtotal > 0) {
+                if ($hasLegacyPayableAmount && $order->customer_payable_amount && $subtotal > 0) {
                     $tv   = $item->sale_price * $item->qty;
                     $dp   = (($tv / ($subtotal + $order->discount)) * $subtotal) / $item->qty;
                 } else {

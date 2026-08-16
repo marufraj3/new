@@ -68,7 +68,6 @@ use App\Http\Controllers\Admin\PopupController;
 use App\Http\Controllers\Vendor\DashboardController as VendorDashboardController;
 use App\Http\Controllers\Vendor\ProductController as VendorProductController;
 use App\Http\Controllers\Vendor\SettingsController as VendorSettingsController;
-use App\Http\Controllers\Reseller\ResellerDashboardController;
 
 
 Route::get('admin/clear-cache', function () {
@@ -248,70 +247,7 @@ Route::prefix('vendor')->name('vendor.')->group(function () {
     Route::get('/ajax-product-childcategory', [VendorProductController::class, 'getChildcategory'])->name('ajax.childcategory');
 });
 
-// Reseller Public Landing Page (no auth)
-Route::get('/r/{slug}', [\App\Http\Controllers\Reseller\PublicLandingController::class, 'show'])->name('reseller.landing.public');
-Route::get('/r/{slug}/category/{categorySlug}', [\App\Http\Controllers\Reseller\PublicLandingController::class, 'category'])->name('reseller.landing.category');
-Route::get('/r/{slug}/subcategory/{subcategorySlug}', [\App\Http\Controllers\Reseller\PublicLandingController::class, 'subcategory'])->name('reseller.landing.subcategory');
-Route::get('/r/{slug}/product/{productSlug}', [\App\Http\Controllers\Reseller\PublicLandingController::class, 'product'])->name('reseller.landing.product');
-
-Route::post('/r/{slug}/cart/add', [\App\Http\Controllers\Reseller\LandingOrderController::class, 'addToCart'])->name('reseller.landing.cart.add');
-Route::get('/r/{slug}/cart/remove/{productId}', [\App\Http\Controllers\Reseller\LandingOrderController::class, 'removeFromCart'])->name('reseller.landing.cart.remove');
-Route::get('/r/{slug}/order', [\App\Http\Controllers\Reseller\LandingOrderController::class, 'orderForm'])->name('reseller.landing.order');
-Route::post('/r/{slug}/order', [\App\Http\Controllers\Reseller\LandingOrderController::class, 'storeOrder'])->name('reseller.landing.order.store');
-Route::get('/r/{slug}/order/success/{orderId}', [\App\Http\Controllers\Reseller\LandingOrderController::class, 'orderSuccess'])->name('reseller.landing.order.success');
-Route::get('/r/{slug}/order-track', [\App\Http\Controllers\Reseller\LandingOrderController::class, 'orderTrack'])->name('reseller.landing.order-track');
-Route::get('/r/{slug}/order-track/result', [\App\Http\Controllers\Reseller\LandingOrderController::class, 'orderTrackResult'])->name('reseller.landing.order-track.result');
-Route::get('/r/{slug}/contact', [\App\Http\Controllers\Reseller\LandingContactController::class, 'show'])->name('reseller.landing.contact');
-Route::post('/r/{slug}/contact', [\App\Http\Controllers\Reseller\LandingContactController::class, 'store'])->name('reseller.landing.contact.store');
-Route::post('/r/{slug}/newsletter/subscribe', [\App\Http\Controllers\Reseller\LandingNewsletterController::class, 'subscribe'])->name('reseller.landing.newsletter.subscribe');
-
-// Reseller protected routes
-Route::prefix('reseller')
-    ->middleware(['auth:admin', 'reseller', 'demo_mode'])
-    ->name('reseller.')
-    ->group(function () {
-        Route::get('/dashboard', [ResellerDashboardController::class, 'index'])->name('dashboard');
-        
-        // Product Catalog
-        Route::get('/products', [\App\Http\Controllers\Reseller\ProductCatalogController::class, 'index'])->name('products.index');
-        Route::get('/products/{slug}', [\App\Http\Controllers\Reseller\ProductCatalogController::class, 'show'])->name('products.show');
-        
-        // Cart
-        Route::post('/cart/add', [\App\Http\Controllers\Reseller\ResellerCartController::class, 'addToCart'])->name('cart.add');
-        Route::post('/cart/add-ajax', [\App\Http\Controllers\Reseller\ResellerCartController::class, 'addToCartAjax'])->name('cart.add.ajax');
-        
-        // Checkout
-        Route::get('/checkout', [\App\Http\Controllers\Reseller\ResellerCheckoutController::class, 'index'])->name('checkout');
-        Route::post('/checkout', [\App\Http\Controllers\Reseller\ResellerCheckoutController::class, 'store'])->name('checkout.store');
-        
-        // Order Success
-        Route::get('/order-success/{id}', [\App\Http\Controllers\Reseller\ResellerOrderSuccessController::class, 'show'])->name('order.success');
-        
-        Route::get('/orders', [ResellerDashboardController::class, 'orders'])->name('orders');
-        Route::get('/customers', [ResellerDashboardController::class, 'customers'])->name('customers');
-        Route::get('/wallet', [ResellerDashboardController::class, 'wallet'])->name('wallet');
-        Route::get('/deposit', [\App\Http\Controllers\Reseller\ResellerDepositController::class, 'index'])->name('deposit');
-        Route::post('/deposit', [\App\Http\Controllers\Reseller\ResellerDepositController::class, 'store'])->name('deposit.store');
-        Route::get('/withdrawals', [\App\Http\Controllers\Reseller\WithdrawalController::class, 'index'])->name('withdrawals.index');
-        Route::post('/withdrawals', [\App\Http\Controllers\Reseller\WithdrawalController::class, 'store'])->name('withdrawals.store');
-        Route::get('/verification', [\App\Http\Controllers\Reseller\VerificationController::class, 'index'])->name('verification.index');
-        Route::post('/verification', [\App\Http\Controllers\Reseller\VerificationController::class, 'store'])->name('verification.store');
-        Route::get('/settings', [\App\Http\Controllers\Reseller\SettingsController::class, 'index'])->name('settings');
-        Route::get('/landing', [\App\Http\Controllers\Reseller\LandingPageController::class, 'index'])->name('landing.index');
-        Route::post('/landing', [\App\Http\Controllers\Reseller\LandingPageController::class, 'store'])->name('landing.store');
-        Route::get('/landing/products', [\App\Http\Controllers\Reseller\LandingProductController::class, 'index'])->name('landing.products');
-        Route::get('/landing/products/add', [\App\Http\Controllers\Reseller\LandingProductController::class, 'addForm'])->name('landing.products.add');
-        Route::post('/landing/products/add', [\App\Http\Controllers\Reseller\LandingProductController::class, 'add'])->name('landing.products.add.store');
-        Route::post('/landing/products/update-price', [\App\Http\Controllers\Reseller\LandingProductController::class, 'updatePrice'])->name('landing.products.update-price');
-        Route::post('/landing/products/remove/{productId}', [\App\Http\Controllers\Reseller\LandingProductController::class, 'remove'])->name('landing.products.remove');
-        
-        // Fraud Check
-        Route::get('/fraud-check', [\App\Http\Controllers\Reseller\ResellerFraudController::class, 'manualFraudCheckPage'])->name('fraud.page');
-        Route::post('/fraud-check', [\App\Http\Controllers\Reseller\ResellerFraudController::class, 'manualFraudCheck'])->name('fraud.check');
-        Route::post('/settings/profile', [\App\Http\Controllers\Reseller\SettingsController::class, 'updateProfile'])->name('settings.profile');
-        Route::post('/settings/password', [\App\Http\Controllers\Reseller\SettingsController::class, 'updatePassword'])->name('settings.password');
-        Route::post('/logout', [\App\Http\Controllers\Reseller\AuthController::class, 'logout'])->name('logout');
-    });
+// Reseller routes intentionally removed. Historical reseller tables/data are preserved.
 
 Route::prefix('admin')
     ->middleware(['auth', 'demo_mode'])
@@ -392,7 +328,6 @@ Route::prefix('admin')->middleware(['auth:admin', 'admin', 'demo_mode'])->group(
 
 // ✅ উদ্যোক্তা পে (UddoktaPay) রাউট
 Route::get('/uddoktapay/checkout', [UddoktaPayController::class, 'checkout'])->name('uddoktapay.checkout');
-Route::get('/uddoktapay/deposit/checkout/{deposit_id}', [UddoktaPayController::class, 'depositCheckout'])->name('uddoktapay.deposit.checkout');
 Route::get('/uddoktapay/verify', [UddoktaPayController::class, 'verify'])->name('uddoktapay.verify');
 Route::get('/uddoktapay/cancel', [UddoktaPayController::class, 'cancel'])->name('uddoktapay.cancel');
 Route::post('/uddoktapay/ipn', [UddoktaPayController::class, 'ipn'])->name('uddoktapay.ipn');
@@ -447,13 +382,6 @@ Route::prefix('admin')->middleware(['auth:admin', 'admin', 'demo_mode'])->group(
     Route::get('/stock-alerts-scan', [\App\Http\Controllers\Admin\StockAlertController::class, 'scan'])
         ->name('admin.stock_alerts.scan');
 
-    // Reseller Orders Management
-    Route::get('/reseller-orders', [\App\Http\Controllers\Admin\ResellerOrderController::class, 'index'])
-        ->name('admin.reseller-orders.index');
-    Route::post('/reseller-orders/update-status', [\App\Http\Controllers\Admin\ResellerOrderController::class, 'updateStatus'])
-        ->name('admin.reseller-orders.update-status');
-    Route::post('/reseller-orders/bulk-update-status', [\App\Http\Controllers\Admin\ResellerOrderController::class, 'bulkUpdateStatus'])
-        ->name('admin.reseller-orders.bulk-update-status');
 });
 
 // Manual Fraud Check Routes
@@ -1006,6 +934,12 @@ Route::get('dashboard', [DashboardController::class, 'dashboard'])->name('admin.
     Route::get('campaign/{id}/builder', [CampaignController::class,'builder'])->name('campaign.builder');
     Route::post('campaign/{id}/builder', [CampaignController::class,'saveBuilder'])->name('campaign.builder.save');
     Route::delete('campaign/{id}/builder', [CampaignController::class,'clearBuilder'])->name('campaign.builder.clear');
+    Route::get('campaign/{id}/custom-builder', [CampaignController::class,'customBuilder'])->name('campaign.custom-builder');
+    Route::post('campaign/{id}/custom-builder/draft', [CampaignController::class,'saveCustomDraft'])->name('campaign.custom-builder.draft');
+    Route::post('campaign/{id}/custom-builder/upload', [CampaignController::class,'uploadCustomSource'])->name('campaign.custom-builder.upload');
+    Route::post('campaign/{id}/custom-builder/publish', [CampaignController::class,'publishCustom'])->name('campaign.custom-builder.publish');
+    Route::post('campaign/{id}/unpublish', [CampaignController::class,'unpublish'])->name('campaign.unpublish');
+    Route::post('campaign/{id}/duplicate', [CampaignController::class,'duplicate'])->name('campaign.duplicate');
     Route::get('campaign/{id}/show', [CampaignController::class,'show'])->name('campaign.show');
     // ⭐ প্রতি-ক্যাম্পেইন অ্যানালিটিক্স (ভিজিট → অর্ডার, কনভার্শন রেট)
     Route::get('campaign/{id}/analytics', [CampaignController::class,'analytics'])->name('campaign.analytics');
@@ -1174,27 +1108,7 @@ Route::get('dashboard', [DashboardController::class, 'dashboard'])->name('admin.
     Route::post('vendor-verifications/{id}/approve', [\App\Http\Controllers\Admin\VendorVerificationController::class,'approve'])->name('admin.vendor.verification.approve');
     Route::post('vendor-verifications/{id}/reject', [\App\Http\Controllers\Admin\VendorVerificationController::class,'reject'])->name('admin.vendor.verification.reject');
 
-    // Reseller Management
-    Route::get('resellers', [\App\Http\Controllers\Admin\ResellerController::class,'index'])->name('admin.resellers.index');
-    Route::get('resellers/{id}/edit', [\App\Http\Controllers\Admin\ResellerController::class,'edit'])->name('admin.resellers.edit');
-    Route::post('resellers/update', [\App\Http\Controllers\Admin\ResellerController::class,'update'])->name('admin.resellers.update');
-    Route::post('resellers/{id}/toggle-status', [\App\Http\Controllers\Admin\ResellerController::class,'toggleStatus'])->name('admin.resellers.toggle-status');
-    Route::delete('resellers/{id}', [\App\Http\Controllers\Admin\ResellerController::class,'destroy'])->name('admin.resellers.destroy');
-    
-    // Reseller Verification Management
-    Route::get('reseller-verifications', [\App\Http\Controllers\Admin\ResellerVerificationController::class,'index'])->name('admin.reseller.verification.index');
-    Route::get('reseller-verifications/{id}', [\App\Http\Controllers\Admin\ResellerVerificationController::class,'show'])->name('admin.reseller.verification.show');
-    Route::post('reseller-verifications/{id}/approve', [\App\Http\Controllers\Admin\ResellerVerificationController::class,'approve'])->name('admin.reseller.verification.approve');
-    Route::post('reseller-verifications/{id}/reject', [\App\Http\Controllers\Admin\ResellerVerificationController::class,'reject'])->name('admin.reseller.verification.reject');
-
-    // Reseller Withdrawal Management
-    Route::get('reseller-withdrawals', [\App\Http\Controllers\Admin\ResellerWithdrawalController::class,'index'])->name('admin.reseller.withdrawals.index');
-    Route::post('reseller-withdrawals/{id}/approve', [\App\Http\Controllers\Admin\ResellerWithdrawalController::class,'approve'])->name('admin.reseller.withdrawals.approve');
-    Route::post('reseller-withdrawals/{id}/reject', [\App\Http\Controllers\Admin\ResellerWithdrawalController::class,'reject'])->name('admin.reseller.withdrawals.reject');
-
-    // Reseller Deposit Management
-    Route::get('reseller-deposits', [\App\Http\Controllers\Admin\ResellerDepositController::class,'index'])->name('admin.reseller-deposits.index');
-    Route::post('reseller-deposits/{id}/mark-paid', [\App\Http\Controllers\Admin\ResellerDepositController::class,'markAsPaid'])->name('admin.reseller-deposits.mark-paid');
+    // Reseller administration removed; existing reseller data remains untouched.
 
     // Refund Management Routes
     Route::get('refunds', [\App\Http\Controllers\Admin\RefundController::class, 'index'])->name('admin.refunds.index');

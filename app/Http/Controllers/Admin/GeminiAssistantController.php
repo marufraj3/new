@@ -289,7 +289,7 @@ class GeminiAssistantController extends Controller
                 $answer = "মোট প্রোডাক্ট: {$stats['total_products']}, Active: {$stats['active_products']}, Pending Approval: {$stats['pending_products']}, Low Stock (≤5): {$stats['low_stock_products']}";
                 break;
             case 'vendors':
-                $answer = "Vendors: {$stats['vendors']}, Pending Verification: {$stats['pending_vendors']}, Resellers: {$stats['resellers']}, Pending Resellers: {$stats['pending_resellers']}";
+                $answer = "Vendors: {$stats['vendors']}, Pending Verification: {$stats['pending_vendors']}";
                 break;
             default:
                 $answer = "Quick stats not found";

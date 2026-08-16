@@ -218,7 +218,12 @@ body.cpb-store-busy { overflow: hidden; }
 .cpb-coupon-msg.is-success { color: #15803d; }
 .cpb-coupon-msg[hidden] { display: none !important; }
 
+/* Custom-code pages get an authoritative commerce fallback when the author omits tokens. */
+.cpb-custom-fallback { padding: 64px 0; background: #f8fafc; }
+.cpb-custom-fallback-inner { width: min(1160px, calc(100% - 32px)); margin: 0 auto; }
+
 @media (max-width: 480px) {
     .cpb-coupon-form { flex-wrap: wrap; }
     .cpb-coupon-form input, .cpb-coupon-form button { width: 100%; }
+    .cpb-custom-fallback { padding: 42px 0; }
 }

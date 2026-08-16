@@ -14,7 +14,7 @@ This feature adds a powerful AI assistant powered by Google Gemini to your e-com
 
 ### 1. Admin Chat Assistant
 - **Route**: `/admin/gemini-assistant` or `/admin/gemini-ai`
-- **AI understands**: Orders, Products, Categories, Customers, Vendors, Resellers, Brands, Fund, Expenses, Purchases, Coupons, Reviews, Blog, SEO, Banner, Popup, Fraud API, SMS/Payment/Courier integrations, Facebook CAPI, GTM, Pixels, Cron jobs etc.
+- **AI understands**: Orders, Products, Categories, Customers, Vendors, Brands, Fund, Expenses, Purchases, Coupons, Reviews, Blog, SEO, Banner, Popup, Fraud API, SMS/Payment/Courier integrations, Facebook CAPI, GTM, Pixels, Cron jobs etc.
 - **Live Data**: Shows real stats (today orders, revenue, pending orders, products, vendors etc.) via cached context (5 min TTL, refreshable)
 - **Multilingual**: Auto detects Bangla / English. Responds in same language user speaks.
 - **Chat History**: Per admin user + session, stored in `gemini_chats` table

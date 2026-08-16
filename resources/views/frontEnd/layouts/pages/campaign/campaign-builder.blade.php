@@ -102,7 +102,14 @@
             '{{contact.phone}}' => e(optional($contact)->phone ?? ''),
             '{{contact.whatsapp}}' => e(optional($contact)->whatsapp ?? ''),
         ];
-        $publishedHtml = strtr((string) ($campaign_data->page_html ?? ''), $tokenValues);
+        $hasRenderedSource = isset($renderPageHtml);
+        $sourceHtml = $hasRenderedSource ? $renderPageHtml : ($campaign_data->page_html ?? '');
+        $publishedHtml = $hasRenderedSource
+            ? (string) $sourceHtml
+            : strtr((string) $sourceHtml, $tokenValues);
+        $publishedCss = $hasRenderedSource ? ($renderPageCss ?? '') : ($campaign_data->page_css ?? '');
+        $publishedJs = $hasRenderedSource ? ($renderPageJs ?? null) : null;
+        $pageType = $pageType ?? 'visual';
     @endphp
 
     <title>{{ $campName }} — {{ optional($generalsetting)->name }}</title>
@@ -112,6 +119,7 @@
     <meta property="og:title" content="{{ $campName }}">
     <meta property="og:description" content="{{ $campaignDescription }}">
     <meta property="og:url" content="{{ route('campaign', $campaign_data->slug) }}">
+    <link rel="canonical" href="{{ route('campaign', $campaign_data->slug) }}">
     @if($campaignImage)<meta property="og:image" content="{{ asset($campaignImage) }}">@endif
     <link rel="shortcut icon" href="{{ asset(optional($generalsetting)->favicon) }}" type="image/x-icon">
 
@@ -125,17 +133,23 @@
          এই পেজের সব স্টাইল campaign-page-renderer.css + builder-এর page_css থেকে আসে
          এবং renderer JS সম্পূর্ণ vanilla। FB ads ট্রাফিকের জন্য ~৩৫০KB সাশ্রয়। --}}
     <link rel="stylesheet" href="{{ asset('public/frontEnd/css/campaign-page-renderer.css') }}">
-    <style id="campaign-builder-page-css">{!! $campaign_data->page_css !!}</style>
+    @if($pageType === 'premium')
+        <link rel="stylesheet" href="{{ asset('public/frontEnd/css/campaign-premium.css') }}">
+    @endif
+    <style id="campaign-builder-page-css">{!! $publishedCss !!}</style>
+
+    {{-- Existing Google Analytics/custom tracking configured in General Settings. --}}
+    {!! optional($generalsetting)->header_code !!}
 
     <script>
         window.dataLayer = window.dataLayer || [];
         window._campaignData = {
             id: @json($campId), name: @json($campName), slug: @json($campaign_data->slug),
-            currency: 'BDT', fb_event_id: @json($fb_view_content_event_id)
+            page_type: @json($pageType), currency: 'BDT', fb_event_id: @json($fb_view_content_event_id)
         };
         window._campaignProducts = @json($storefrontProducts);
         window.dataLayer.push({
-            event: 'campaign_page_loaded', page_type: 'campaign_landing_builder',
+            event: 'campaign_page_loaded', page_type: @json('campaign_landing_' . $pageType),
             campaign_id: @json($campId), campaign_name: @json($campName), currency: 'BDT', value: {{ $campValue }},
             ecommerce: { currency: 'BDT', items: @json($gtmItems) }
         });
@@ -175,7 +189,8 @@
 
     <main
         id="campaign-builder-storefront"
-        class="cpb-published-page"
+        class="cpb-published-page cpb-page-{{ $pageType }}"
+        data-page-type="{{ $pageType }}"
         data-change-product-url="{{ route('cart.changeProduct') }}"
         data-cart-update-url="{{ route('cart.update') }}"
         data-cart-increment-url="{{ route('cart.increment') }}"
@@ -253,5 +268,8 @@
     <div id="cpb-store-toast" class="cpb-store-toast" role="status" aria-live="polite"></div>
 
     <script src="{{ asset('public/frontEnd/js/campaign-page-renderer.js') }}"></script>
+    @if(filled($publishedJs))
+        <script id="campaign-custom-page-js">{!! $publishedJs !!}</script>
+    @endif
 </body>
 </html>

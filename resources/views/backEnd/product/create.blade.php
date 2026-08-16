@@ -256,11 +256,6 @@
                             </div>
                         </div>
 
-                        <div class="form-group mb-3">
-                            <label class="form-label">Reseller Price</label>
-                            <input type="number" step="0.01" name="reseller_price" class="form-control" placeholder="Reseller price (optional)">
-                            <small class="text-muted">Special price for resellers. Leave empty if not applicable.</small>
-                        </div>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">

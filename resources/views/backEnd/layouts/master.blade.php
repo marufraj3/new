@@ -287,11 +287,6 @@
     <ul class="nav-second-level">
       @can('order-list')
       <li><a href="{{ route('admin.orders', ['slug'=>'all']) }}"><i data-feather="file-plus"></i> All Order</a></li>
-	        @can('order-list')
-      <li>
-        <a href="{{ route('admin.reseller-orders.index') }}"><i data-feather="users"></i> Reseller Orders</a>
-      </li>
-      @endcan
       <li><a href="{{ route('admin.incomplete-orders.index') }}"><i data-feather="file-plus"></i> Incomplete Orders</a></li>
       @foreach($orderstatus as $value)
         <li><a href="{{ route('admin.orders', ['slug'=>$value->slug]) }}"><i data-feather="file-plus"></i>{{ $value->name }}</a></li>
@@ -666,64 +661,6 @@
       @endcan
       @can('vendor-withdrawal')
       <li><a href="{{ route('admin.vendor.withdrawals.index') }}"><i data-feather="dollar-sign"></i> Vendor Withdrawals</a></li>
-      @endcan
-    </ul>
-  </div>
-</li>
-@endcanany
-@endif
-
-{{-- Resellers --}}
-@php
-  $resellerEnabled = (isset($generalsetting) && $generalsetting) ? (isset($generalsetting->reseller_enabled) ? $generalsetting->reseller_enabled : 1) : 1;
-@endphp
-@if($resellerEnabled == 1)
-@canany(['reseller-list', 'reseller-create', 'reseller-edit', 'reseller-verification', 'reseller-withdrawal'])
-@php
-  $pendingResellerVerificationCount = \App\Models\User::where('role', 'reseller')->where('verification_status', 'pending')->count();
-  $pendingResellerWithdrawalCount = \App\Models\ResellerWithdrawal::where('status', 'pending')->count();
-@endphp
-<li>
-  <a href="#sidebar-resellers" data-bs-toggle="collapse">
-    <i data-feather="user-check"></i>
-    <span> Resellers </span>
-    <span class="menu-arrow"></span>
-  </a>
-  <div class="collapse {{ request()->routeIs('admin.resellers.*') || request()->routeIs('admin.reseller.verification.*') || request()->routeIs('admin.reseller.withdrawals.*') || request()->routeIs('admin.reseller-deposits.*') ? 'show' : '' }}" id="sidebar-resellers">
-    <ul class="nav-second-level">
-      @can('reseller-list')
-      <li><a href="{{ route('admin.resellers.index') }}"><i data-feather="file-plus"></i> All Resellers</a></li>
-      @endcan
-      @can('reseller-withdrawal')
-      <li>
-        <a href="{{ route('admin.reseller-deposits.index') }}">
-          <i data-feather="wallet"></i> Reseller Deposits
-          @php $pendingDepositCount = \App\Models\ResellerDeposit::where('status', 'pending')->count(); @endphp
-          @if($pendingDepositCount > 0)
-            <span class="badge bg-warning rounded-pill float-end">{{ $pendingDepositCount }}</span>
-          @endif
-        </a>
-      </li>
-      @endcan
-      @can('reseller-verification')
-      <li>
-        <a href="{{ route('admin.reseller.verification.index') }}">
-          <i data-feather="shield-check"></i><i data-feather="file-plus"></i> Reseller Verifications
-          @if($pendingResellerVerificationCount > 0)
-            <span class="badge bg-danger rounded-pill float-end">{{ $pendingResellerVerificationCount }}</span>
-          @endif
-        </a>
-      </li>
-      @endcan
-      @can('reseller-withdrawal')
-      <li>
-        <a href="{{ route('admin.reseller.withdrawals.index') }}">
-          <i data-feather="dollar-sign"></i> Reseller Withdrawals
-          @if($pendingResellerWithdrawalCount > 0)
-            <span class="badge bg-warning rounded-pill float-end">{{ $pendingResellerWithdrawalCount }}</span>
-          @endif
-        </a>
-      </li>
       @endcan
     </ul>
   </div>

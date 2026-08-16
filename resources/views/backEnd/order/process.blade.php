@@ -54,14 +54,14 @@
     </thead>
     <tbody>
         @php
-            // Check if this is a reseller order (once, outside loop)
-            // Reseller orders ALWAYS have customer_payable_amount field set
-            $isResellerOrderItem = !empty($data->customer_payable_amount);
+            // Check if this is a legacy order (once, outside loop)
+            // Legacy orders ALWAYS have customer_payable_amount field set
+            $hasLegacyPayableAmountItem = !empty($data->customer_payable_amount);
             
-            // For reseller orders: calculate custom_price from customer_payable_amount
+            // For legacy orders: calculate custom_price from customer_payable_amount
             $customPrice = null;
             $totalProductValue = 0;
-            if ($isResellerOrderItem && $data->customer_payable_amount) {
+            if ($hasLegacyPayableAmountItem && $data->customer_payable_amount) {
                 $customPrice = $data->customer_payable_amount - ($data->shipping_charge ?? 0);
                 // Calculate total of all products (sum of sale_price * qty)
                 foreach ($data->orderdetails as $od) {
@@ -71,13 +71,13 @@
         @endphp
         @foreach($data->orderdetails as $key => $product)
         @php
-            // For reseller orders: Calculate price from customer_payable_amount proportionally
+            // For legacy orders: Calculate price from customer_payable_amount proportionally
             // customer_payable_amount = custom_price + shipping
-            // custom_price = reseller যে দামে sell করেছে (total)
+            // custom_price = historical customer payable total (total)
             // For normal orders: show sale_price (main price)
             
-            if ($isResellerOrderItem && $customPrice && $totalProductValue > 0) {
-                // Reseller order: Calculate per product price from customer_payable_amount
+            if ($hasLegacyPayableAmountItem && $customPrice && $totalProductValue > 0) {
+                // Legacy order: Calculate per product price from customer_payable_amount
                 // This product's share = (this product's value / total value) * custom_price
                 $thisProductValue = $product->sale_price * $product->qty;
                 $thisProductShare = ($thisProductValue / $totalProductValue) * $customPrice;
@@ -210,12 +210,12 @@
 
                     <!-- ✅ Order Amount Section -->
                     @php
-                        // Check if this is a reseller order
-                        $isResellerOrder = !empty($data->customer_payable_amount);
+                        // Check if this is a legacy order
+                        $hasLegacyPayableAmount = !empty($data->customer_payable_amount);
                         
                         // Calculate subtotal
-                        if ($isResellerOrder && $data->customer_payable_amount) {
-                            // Reseller order: subtotal = customer_payable_amount - shipping
+                        if ($hasLegacyPayableAmount && $data->customer_payable_amount) {
+                            // Legacy order: subtotal = customer_payable_amount - shipping
                             $subtotal = $data->customer_payable_amount - ($data->shipping_charge ?? 0);
                         } else {
                             // Normal customer order: calculate from sale_price
@@ -226,15 +226,15 @@
                         
                         $shipping = $data->shipping_charge ?? 0;
                         $discount = $data->discount ?? 0;
-                        $finalTotal = $isResellerOrder ? ($data->customer_payable_amount ?? $data->amount) : $data->amount;
+                        $finalTotal = $hasLegacyPayableAmount ? ($data->customer_payable_amount ?? $data->amount) : $data->amount;
                     @endphp
 
                     <div class="col-sm-12 mt-3">
                         <div class="payment-box">
                             <h5 class="mb-3"><i class="fa fa-money-bill-wave"></i> Order Amount Information</h5>
-                            @if($isResellerOrder)
+                            @if($hasLegacyPayableAmount)
                                 <div class="alert alert-warning mb-3">
-                                    <i class="fa fa-user-tag"></i> <strong>Reseller Order</strong> - Showing customer payable amount
+                                    <i class="fa fa-user-tag"></i> <strong>Legacy Order</strong> - Showing customer payable amount
                                 </div>
                             @endif
                             <div class="row">
@@ -251,7 +251,7 @@
                                     <span class="payment-value">৳{{ number_format($discount, 2) }}</span>
                                 </div>
                                 <div class="col-md-6 mb-2">
-                                    <label class="payment-label"><strong>{{ $isResellerOrder ? 'Customer Payable Amount' : 'Final Total' }}:</strong></label>
+                                    <label class="payment-label"><strong>{{ $hasLegacyPayableAmount ? 'Customer Payable Amount' : 'Final Total' }}:</strong></label>
                                     <span class="payment-value" style="font-size: 18px; color: #28a745;"><strong>৳{{ number_format($finalTotal, 2) }}</strong></span>
                                 </div>
                             </div>

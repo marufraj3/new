@@ -414,7 +414,6 @@ class ProductController extends Controller
             'purchase_price' => 'nullable|numeric|min:0',
             'stock'          => 'nullable|integer|min:0',
             'description'    => 'required',
-            'reseller_price' => 'nullable|numeric|min:0',
 
             'product_type'        => 'required|in:physical,digital',
             'digital_file'        => 'nullable|file|max:51200',

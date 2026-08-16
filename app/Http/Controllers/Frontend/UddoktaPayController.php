@@ -26,43 +26,6 @@ class UddoktaPayController extends Controller
         $this->facebookCapiService = $facebookCapiService;
     }
     /**
-     * Reseller wallet deposit checkout - redirect to UddoktaPay
-     */
-    public function depositCheckout($deposit_id)
-    {
-        $deposit = \App\Models\ResellerDeposit::where('id', $deposit_id)->where('status', 'pending')->firstOrFail();
-        $user = $deposit->user;
-        $authUser = \Illuminate\Support\Facades\Auth::guard('admin')->user();
-        if (!$authUser || $authUser->id != $user->id) {
-            return redirect()->route('reseller.dashboard')->with('error', 'Unauthorized.');
-        }
-
-        $uddoktapay = UddoktaPay::make(env('UDDOKTAPAY_API_KEY'), env('UDDOKTAPAY_API_URL'));
-        try {
-            $checkoutRequest = CheckoutRequest::make()
-                ->setFullName($user->name ?? 'Reseller')
-                ->setEmail($user->email ?? 'reseller@example.com')
-                ->setAmount((float) $deposit->amount)
-                ->addMetadata('payment_type', 'deposit')
-                ->addMetadata('deposit_id', $deposit->id)
-                ->addMetadata('user_id', $user->id)
-                ->setRedirectUrl(route('uddoktapay.verify'))
-                ->setCancelUrl(route('reseller.wallet') . '?deposit=cancelled')
-                ->setWebhookUrl(route('uddoktapay.ipn'));
-
-            $response = $uddoktapay->checkout($checkoutRequest);
-            if ($response->failed()) {
-                Log::error('UddoktaPay Deposit Checkout Failed: ' . $response->message());
-                return redirect()->route('reseller.deposit')->with('error', 'Payment initiation failed.');
-            }
-            return redirect($response->paymentURL());
-        } catch (UddoktaPayException $e) {
-            Log::error('UddoktaPay Deposit Error: ' . $e->getMessage());
-            return redirect()->route('reseller.deposit')->with('error', 'Payment Error: ' . $e->getMessage());
-        }
-    }
-
-    /**
      * Redirect user to UddoktaPay checkout page
      */
     public function checkout(Request $request, $order_id = null)
@@ -86,7 +49,7 @@ class UddoktaPayController extends Controller
         if (Session::has('payable_amount') && Session::get('payable_amount') > 0) {
             $amount = (float) Session::get('payable_amount');
         } elseif ($order->customer_payable_amount) {
-            // Reseller order: use customer_payable_amount (includes shipping charge)
+            // Use preserved customer_payable_amount when a historical order has one.
             $amount = (float) $order->customer_payable_amount;
         } else {
             // সেশনে না পেলে ডিফল্ট ফুল এমাউন্ট
@@ -142,9 +105,9 @@ class UddoktaPayController extends Controller
             $response = $uddoktapay->verify($request);
             $metadata = $response->metadata();
 
-            // Reseller deposit
-            if (isset($metadata['payment_type']) && $metadata['payment_type'] === 'deposit' && !empty($metadata['deposit_id'])) {
-                return $this->handleDepositVerify($response);
+            // Retired reseller deposit callbacks are rejected without mutating preserved data.
+            if (($metadata['payment_type'] ?? null) === 'deposit') {
+                abort(410, 'Reseller deposits are no longer supported.');
             }
 
             $order_id = $metadata['order_id'] ?? null;
@@ -170,7 +133,7 @@ class UddoktaPayController extends Controller
                     if (Session::has('payable_amount')) {
                         $payment->amount = Session::get('payable_amount');
                     } elseif ($order->customer_payable_amount) {
-                        // Reseller order: use customer_payable_amount (includes shipping charge)
+                        // Use preserved customer_payable_amount when a historical order has one.
                         $payment->amount = $order->customer_payable_amount;
                     } else {
                         // Fallback: use order amount
@@ -237,7 +200,7 @@ class UddoktaPayController extends Controller
                 // সেশন ক্লিয়ার
                 Session::forget('payable_amount');
 
-                $redirectRoute = ($order->reseller_profit) ? 'reseller.order.success' : 'customer.order_success';
+                $redirectRoute = 'customer.order_success';
                 return redirect()->route($redirectRoute, $order->id)
                                  ->with('success', 'Payment Successful! Your digital downloads are ready.');
             } else {
@@ -246,7 +209,7 @@ class UddoktaPayController extends Controller
                 $order->payment_gateway = 'uddoktapay';
                 $order->save();
 
-                $redirectRoute = ($order->reseller_profit) ? 'reseller.order.success' : 'customer.order_success';
+                $redirectRoute = 'customer.order_success';
                 return redirect()->route($redirectRoute, $order->id)
                                  ->with('error', 'Payment Failed!');
             }
@@ -267,47 +230,6 @@ class UddoktaPayController extends Controller
     }
 
     /**
-     * Handle reseller deposit verification
-     */
-    private function handleDepositVerify($response)
-    {
-        $metadata = $response->metadata();
-        $depositId = $metadata['deposit_id'] ?? null;
-        $deposit = \App\Models\ResellerDeposit::find($depositId);
-
-        if (!$deposit || $deposit->status !== 'pending') {
-            return redirect()->route('reseller.wallet')->with('error', 'Deposit not found or already processed.');
-        }
-
-        if ($response->success()) {
-            $deposit->status = 'completed';
-            $deposit->transaction_id = $response->transactionId();
-            $deposit->save();
-
-            $user = $deposit->user;
-            $user->wallet_balance = ($user->wallet_balance ?? 0) + (float) $deposit->amount;
-            $user->save();
-
-            \App\Models\ResellerWalletTransaction::log(
-                $user->id, 'deposit', (float) $deposit->amount,
-                'ResellerDeposit', $deposit->id,
-                'উদ্যোক্তা পে ডিপোজিট #' . $deposit->id
-            );
-
-            Log::info("Reseller deposit #{$deposit->id} completed. User #{$user->id} wallet +{$deposit->amount}");
-            return redirect()->route('reseller.wallet')->with('success', 'ডিপোজিট সফল! আপনার ওয়ালেটে ৳' . number_format($deposit->amount, 2) . ' যোগ হয়েছে।');
-        }
-
-        if ($response->pending()) {
-            return redirect()->route('reseller.wallet')->with('info', 'পেমেন্ট পেন্ডিং রয়েছে। এডমিন পেমেন্ট নিশ্চিত করলে আপনার ওয়ালেটে যোগ হবে।');
-        }
-
-        $deposit->status = 'failed';
-        $deposit->save();
-        return redirect()->route('reseller.wallet')->with('error', 'পেমেন্ট ব্যর্থ হয়েছে।');
-    }
-
-    /**
      * IPN (Instant Payment Notification)
      * Called automatically from UddoktaPay server after payment.
      */
@@ -319,26 +241,9 @@ class UddoktaPayController extends Controller
         if ($response->success()) {
             $metadata = $response->metadata();
 
-            // Reseller deposit
-            if (isset($metadata['payment_type']) && $metadata['payment_type'] === 'deposit' && !empty($metadata['deposit_id'])) {
-                $deposit = \App\Models\ResellerDeposit::find($metadata['deposit_id']);
-                if ($deposit && $deposit->status === 'pending') {
-                    $deposit->status = 'completed';
-                    $deposit->transaction_id = $response->transactionId();
-                    $deposit->save();
-                    $user = $deposit->user;
-                    $user->wallet_balance = ($user->wallet_balance ?? 0) + (float) $deposit->amount;
-                    $user->save();
-
-                    \App\Models\ResellerWalletTransaction::log(
-                        $user->id, 'deposit', (float) $deposit->amount,
-                        'ResellerDeposit', $deposit->id,
-                        'উদ্যোক্তা পে ডিপোজিট #' . $deposit->id . ' (IPN)'
-                    );
-
-                    Log::info("Reseller deposit #{$deposit->id} completed via IPN.");
-                }
-                return response()->json(['received' => true]);
+            // Retired reseller deposit IPNs are acknowledged without changing preserved data.
+            if (($metadata['payment_type'] ?? null) === 'deposit') {
+                return response()->json(['received' => true, 'ignored' => true], 410);
             }
 
             $order_id = $metadata['order_id'] ?? null;

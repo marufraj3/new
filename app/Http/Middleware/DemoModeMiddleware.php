@@ -20,7 +20,7 @@ class DemoModeMiddleware
         }
 
         $path = $request->path();
-        $allowedPostPaths = ['vendor/logout', 'reseller/logout'];
+        $allowedPostPaths = ['vendor/logout'];
         foreach ($allowedPostPaths as $p) {
             if (str_contains($path, $p)) {
                 return $next($request);

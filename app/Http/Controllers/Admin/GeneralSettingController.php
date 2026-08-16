@@ -121,7 +121,7 @@ class GeneralSettingController extends Controller
 		 $input['og_baner'] = $image4Url;
         
         $input['vendor_enabled'] = $request->has('vendor_enabled') ? 1 : 0;
-        $input['reseller_enabled'] = $request->has('reseller_enabled') ? 1 : 0;
+        $input['reseller_enabled'] = 0; // Legacy column retained; reseller runtime is disabled.
         $input['news_ticker_enabled'] = $request->has('news_ticker_enabled') ? 1 : 0;
         
         GeneralSetting::create($input);
@@ -231,9 +231,9 @@ class GeneralSettingController extends Controller
         }
         $input['status'] = 1;
         
-        // Handle vendor_enabled and reseller_enabled (checkbox returns '1' if checked, null if unchecked)
+        // Handle the active vendor module checkbox. Keep retired reseller settings intact.
         $input['vendor_enabled'] = $request->has('vendor_enabled') ? 1 : 0;
-        $input['reseller_enabled'] = $request->has('reseller_enabled') ? 1 : 0;
+        $input['reseller_enabled'] = $update_data->reseller_enabled ?? 0;
         $input['news_ticker_enabled'] = $request->has('news_ticker_enabled') ? 1 : 0;
         $input['quick_order_popup_enabled'] = $request->has('quick_order_popup_enabled') ? 1 : 0;
         
