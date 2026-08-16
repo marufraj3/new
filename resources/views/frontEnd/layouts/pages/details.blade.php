@@ -24,7 +24,23 @@
     $pdOff = (!empty($details->old_price) && $details->old_price > $details->new_price)
         ? round((($details->old_price - $details->new_price) * 100) / $details->old_price) : 0;
     $pdRating = $reviews->count() ? (int) round($reviews->avg('ratting')) : 0;
-    $pdStock = (int) ($details->stock ?? 0);
+
+    // স্টক হিসাব — ভ্যারিয়েন্ট লেভেলের ট্র্যাকিং থাকলে সেটাকে প্রাধান্য দিই,
+    // নাহলে প্রোডাক্টের মেইন stock কলাম থেকে নিই,
+    // কোনোটিই না থাকলে 1 ধরে নিই (স্টক চেক ডিজেবল)
+    $__variantRows = ($details->variantPrices ?? collect());
+    $__hasTracked = $__variantRows->contains(fn ($v) => $v->stock !== null);
+    $__hasUntracked = $__variantRows->contains(fn ($v) => $v->stock === null);
+    $__productStock = (int) ($details->stock ?? 0);
+    if ($__hasTracked) {
+        // শুধু non-null স্টক যোগ — null গুলো ফলব্যাক (প্রোডাক্ট স্টক) থেকে নিই
+        $__trackedSum = (int) $__variantRows->sum(fn ($v) => $v->stock !== null ? max(0, (int) $v->stock) : 0);
+        $__untrackedBonus = $__hasUntracked ? max(0, $__productStock) : 0;
+        $pdStock = $__trackedSum + $__untrackedBonus;
+    } else {
+        // ভ্যারিয়েন্টে স্টক ট্র্যাক না হলে প্রোডাক্টের মেইন stock কলাম ব্যবহার করি
+        $pdStock = $__productStock;
+    }
     $pdHasStock = $pdStock > 0;
 @endphp
 
@@ -77,7 +93,7 @@
                             <span class="sf-old-price">৳{{ number_format((float) $details->old_price) }}</span>
                             <span class="sf-badge sf-badge--accent">Save ৳{{ number_format((float) ($details->old_price - $details->new_price)) }}</span>
                         @endif
-                        <span class="sf-pd__stock {{ $pdHasStock ? 'in' : 'out' }}">
+                        <span class="sf-pd__stock {{ $pdHasStock ? 'in' : 'out' }}" id="sfStockStatus">
                             <i class="fa-solid fa-circle" style="font-size:8px;margin-right:4px"></i>
                             {{ $pdHasStock ? 'In Stock' : 'Out of Stock' }}
                         </span>
@@ -117,17 +133,38 @@
                             @if($productsizes->count())
                                 <div class="sf-pd__var">
                                     <label>Size <span class="sf-faint">— pick one</span></label>
-                                    <div class="sf-opt-group">
+                                    <div class="sf-opt-group" id="sfSizeGroup">
                                         @foreach($productsizes as $prosize)
                                             @php
-                                                $sizeStock = $details->variantPrices->where('size_id', $prosize->id)->sum(fn($v) => $v->stock !== null ? max(0, (int) $v->stock) : 0);
-                                                $hasSizeStock = $details->variantPrices->where('size_id', $prosize->id)->contains(fn($v) => $v->stock !== null);
-                                                $sizeOut = $hasSizeStock && $sizeStock <= 0;
+                                                // এই সাইজের সব ভ্যারিয়েন্ট ধরে — color ভ্যারিয়েশন মিলিয়ে আসল stock বের করি
+                                                $variantsForSize = $details->variantPrices->where('size_id', $prosize->id);
+                                                $trackedVariants = $variantsForSize->filter(fn($v) => $v->stock !== null);
+                                                $untrackedVariants = $variantsForSize->filter(fn($v) => $v->stock === null);
+
+                                                // ট্র্যাকড ভ্যারিয়েন্ট থাকলে তাদের মোট যোগ করি
+                                                $trackedStock = (int) $trackedVariants->sum(fn($v) => max(0, (int) $v->stock));
+                                                $hasTrackedStock = $trackedVariants->isNotEmpty();
+                                                $hasUntracked   = $untrackedVariants->isNotEmpty();
+
+                                                // প্রোডাক্টের মেইন স্টক কলাম — ফলব্যাক হিসেবে ব্যবহার হবে
+                                                $productMainStock = (int) ($details->stock ?? 0);
+
+                                                // সাইজকে "out" ধরবো শুধু তখনই —
+                                                // 1) কিছু ভ্যারিয়েন্টে stock ট্র্যাক করা হয়েছে (non-null) এবং তাদের মোট stock <= 0
+                                                // 2) এবং কোনো untracked ভ্যারিয়েন্ট নেই যেগুলো main stock অনুসরণ করবে
+                                                $sizeOut = $hasTrackedStock && $trackedStock <= 0 && !($hasUntracked && $productMainStock > 0);
+
+                                                // ব্যবহারকারীকে দেখানোর "X available" কাউন্ট —
+                                                // untracked ভ্যারিয়েন্ট থাকলে tracked sum + main stock এর min;
+                                                // otherwise শুধু tracked sum
+                                                $sizeDisplayStock = $hasUntracked
+                                                    ? max($trackedStock, $productMainStock)
+                                                    : $trackedStock;
                                             @endphp
-                                            <label class="sf-opt {{ $sizeOut ? 'is-disabled' : '' }}" style="{{ $sizeOut ? 'opacity:.4;pointer-events:none;text-decoration:line-through' : '' }}">
+                                            <label class="sf-opt size-opt {{ $sizeOut ? 'is-disabled' : '' }}" data-size-id="{{ $prosize->id }}" style="{{ $sizeOut ? 'opacity:.4;pointer-events:none;text-decoration:line-through' : '' }}">
                                                 <input type="radio" name="product_size" value="{{ $prosize->id }}" {{ $sizeOut ? 'disabled' : '' }} style="display:none" />
                                                 {{ $prosize->sizeName ?? $prosize->name }}
-                                                @if($hasSizeStock && !$sizeOut)<small style="display:block;font-size:10px;color:#087a45;font-weight:700">{{ $sizeStock }} available</small>@endif
+                                                @if(!$sizeOut && $hasTrackedStock)<small class="size-stock-hint" style="display:block;font-size:10px;color:#087a45;font-weight:700">{{ $sizeDisplayStock }} available</small>@elseif(!$sizeOut && !$hasTrackedStock && $productMainStock > 0)<small style="display:block;font-size:10px;color:#087a45;font-weight:700">{{ $productMainStock }} available</small>@endif
                                             </label>
                                         @endforeach
                                     </div>
@@ -362,7 +399,25 @@
             match = variants.find(v => String(v.size_id ?? v.size) == String(size) && (v.color_id === null || v.color_id === ''));
         }
         let basePrice = parseFloat({{ $details->new_price }});
-        if (match && match.price !== undefined && match.price !== null) basePrice = parseFloat(match.price);
+        if (match && match.price !== undefined && match.price !== null && match.price !== '') {
+            basePrice = parseFloat(match.price);
+        }
+
+        // স্টক ইন্ডিকেটর আপডেট করি — নির্বাচিত ভ্যারিয়েন্টের stock দেখাবো
+        let stockEl = document.getElementById('sfStockStatus');
+        if (stockEl) {
+            let hasStock = true;
+            if (match && match.stock !== undefined && match.stock !== null && match.stock !== '') {
+                hasStock = parseInt(match.stock) > 0;
+            } else if (!variants.length) {
+                hasStock = (parseInt({{ $pdStock }})) > 0;
+            } else {
+                // কোনো নির্দিষ্ট ভ্যারিয়েন্ট সিলেক্ট না হলে পেজের সামগ্রিক stock দেখাই
+                hasStock = (parseInt({{ $pdStock }})) > 0;
+            }
+            stockEl.className = 'sf-pd__stock ' + (hasStock ? 'in' : 'out');
+            stockEl.innerHTML = '<i class="fa-solid fa-circle" style="font-size:8px;margin-right:4px"></i>' + (hasStock ? 'In Stock' : 'Out of Stock');
+        }
 
         @if($details->is_wholesale && $details->wholesalePrices && $details->wholesalePrices->count() > 0)
         let qty = parseInt($("input[name='qty']").val()) || 1;
@@ -378,6 +433,83 @@
     $(document).on('change', "input[name='product_color'], input[name='product_size']", updateVariantPrice);
     $(document).on('change', "input[name='qty']", updateVariantPrice);
     $(document).ready(function () { updateVariantPrice(); });
+
+    /* ---------- Color → size stock recalc ---------- */
+    // একটা নির্দিষ্ট color সিলেক্ট করলেও size "out" দেখাবো শুধু তখনই — যখন
+    // ঐ size-এর সব color combinations স্টক ০ এবং কোনো untracked fallback নেই।
+    /* ---------------------------------------------- */
+    function refreshSizeByColor(colorId) {
+        const $sizes = $('.size-opt');
+        if (!$sizes.length) return;
+
+        $sizes.each(function(){
+            const sizeId = $(this).data('size-id');
+            // ঐ size-এর সব variants যেগুলো: color=null/undef OR color কারেন্ট color এর সাথে মিলে
+            const matching = variants.filter(v =>
+                String(v.size_id ?? v.size) == String(sizeId) &&
+                ((v.color_id === null || v.color_id === '' || v.color_id === undefined) || (colorId && String(v.color_id ?? v.color) == String(colorId)))
+            );
+
+            let anyPositive = false;
+            let displayStock = 0;
+            let hasTracked = false;
+            let hasUntrackedInSize = false;
+            matching.forEach(v => {
+                if (v.stock === null || v.stock === undefined || v.stock === '') {
+                    hasUntrackedInSize = true;
+                } else {
+                    hasTracked = true;
+                    const s = parseInt(v.stock) || 0;
+                    if (s > 0) anyPositive = true;
+                    displayStock += s;
+                }
+            });
+
+            // সেই size-এর সব variants (সব color মিলিয়ে) আলাদাভাবে গণনা করি
+            // — কারণ নির্দিষ্ট color-এ সাইজ out হলেও অন্য color-এ থাকতে পারে,
+            // এখানে আমরা শুধুমাত্র "selected color এর সাথে মিল" দেখাই (UI সহজ রাখতে)
+            const productStock = parseInt({{ $pdStock }});
+
+            // Size out হবে শুধুমাত্র তখনই যখন:
+            // ১) এই কম্বোতে কিছু tracked variant স্টক আছে, সবগুলোর স্টক <= 0 এবং
+            // ২) কোনো untracked variant নেই যেটা product stock দিয়ে fallback নিত
+            const sizeOut = hasTracked && !anyPositive && !(hasUntrackedInSize && productStock > 0);
+
+            $(this).toggleClass('is-disabled', !!sizeOut);
+            $(this).css('opacity', sizeOut ? 0.4 : 1);
+            $(this).css('pointer-events', sizeOut ? 'none' : '');
+            $(this).css('text-decoration', sizeOut ? 'line-through' : '');
+
+            const $input = $(this).find('input[name=product_size]');
+            $input.prop('disabled', !!sizeOut);
+
+            // "available" কাউন্ট আপডেট
+            const $hint = $(this).find('.size-stock-hint');
+            $hint.remove();
+            if (!sizeOut) {
+                if (hasTracked && displayStock > 0) {
+                    const finalStock = hasUntrackedInSize
+                        ? Math.max(displayStock, productStock)
+                        : displayStock;
+                    $(this).append('<small class="size-stock-hint" style="display:block;font-size:10px;color:#087a45;font-weight:700">' + finalStock + ' available</small>');
+                } else if (!hasTracked && productStock > 0) {
+                    $(this).append('<small class="size-stock-hint" style="display:block;font-size:10px;color:#087a45;font-weight:700">' + productStock + ' available</small>');
+                }
+            }
+
+            // size out হয়ে গেলে পুরনো সিলেকশন সরাই
+            if (sizeOut && $input.is(':checked')) { $input.prop('checked', false); }
+        });
+    }
+
+    $(document).on('change', "input[name='product_color']", function () {
+        refreshSizeByColor($(this).val());
+    });
+    $(document).ready(function () {
+        // পেজে ঢুকে যদি কোনো color ডিফল্ট চেক করা থাকে, তাহলে সাইজগুলো রি-ক্যালক করি
+        var initialColor = $("input[name='product_color']:checked").val();
+        if (initialColor) refreshSizeByColor(initialColor);
+    });
 
     /* ---------- Color → image filter ---------- */
     var productImages = @json($details->images->map(fn($img) => ['src' => asset($img->image), 'color_id' => $img->color_id]));
