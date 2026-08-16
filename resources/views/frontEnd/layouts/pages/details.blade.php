@@ -1,1354 +1,439 @@
 @extends('frontEnd.layouts.master')
-@section('title', $details->name) 
+
+@section('title', $details->name)
+
 @push('seo')
 @php
     $metaTitle = $details->meta_title ?? $details->name;
-    $metaDescription = $details->meta_description ?? Str::limit(strip_tags($details->description), 160);
-    $metaKeywords = $details->meta_keywords ?? $details->name;
+    $metaDescription = $details->meta_description ?? Str::limit(strip_tags($details->description ?? ''), 160);
     $metaImage = $details->meta_image ? asset($details->meta_image) : asset(optional($details->image)->image);
 @endphp
-
-<meta name="app-url" content="{{ route('product', $details->slug) }}" />
-<meta name="robots" content="index, follow" />
-
-<meta name="title" content="{{ $metaTitle }}" />
 <meta name="description" content="{{ $metaDescription }}" />
-<meta name="keywords" content="{{ $metaKeywords }}" />
-
-<!-- Twitter Card data -->
-<meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:site" content="@gomobd" />
-<meta name="twitter:title" content="{{ $metaTitle }}" />
-<meta name="twitter:description" content="{{ $metaDescription }}" />
-<meta name="twitter:image" content="{{ $metaImage }}" />
-
-<!-- Open Graph data -->
+<meta name="keywords" content="{{ $details->meta_keywords ?? $details->name }}" />
 <meta property="og:title" content="{{ $metaTitle }}" />
 <meta property="og:type" content="product" />
 <meta property="og:url" content="{{ route('product', $details->slug) }}" />
 <meta property="og:image" content="{{ $metaImage }}" />
 <meta property="og:description" content="{{ $metaDescription }}" />
-<meta property="og:site_name" content="gomobd.com" />
-
-{{-- ⭐ স্ট্রাকচার্ড ডেটা (JSON-LD) — Google সার্চ রেজাল্টে দাম, স্টক অবস্থা ও
-     তারকা রেটিং দেখানোর জন্য। রিভিউ না থাকলে রেটিং অংশটি বাদ যায়। --}}
-{!! app(\App\Services\ProductSchemaService::class)->productScript(
-        $details,
-        $reviews ?? null,
-        route('product', $details->slug)
-   ) !!}
-@endpush
-
-
-@push('css')
-<link rel="stylesheet" href="{{ asset('public/frontEnd/css/zoomsl.css') }}">
-<style>
-/* ✅ Scoped Review Section */
-.gomobd-review-section {
-    font-family: 'Poppins', sans-serif;
-}
-
-/* Title */
-.gomobd-review-section .gomobd-review-title {
-    font-size: 20px;
-    color: #222;
-}
-
-/* Review Card */
-.gomobd-review-section .gomobd-review-card {
-    background: #fff;
-    border: 1px solid #e6e6e6;
-    border-radius: 10px;
-    padding: 16px 20px;
-    transition: all 0.3s ease-in-out;
-}
-.gomobd-review-section .gomobd-review-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-}
-
-/* Header */
-.gomobd-review-section .gomobd-review-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-}
-
-/* Avatar */
-.gomobd-review-section .gomobd-review-avatar {
-    width: 45px;
-    height: 45px;
-    border-radius: 50%;
-    background: #198754;
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    font-weight: 600;
-    margin-right: 12px;
-}
-
-/* Name + Date */
-.gomobd-review-section .gomobd-review-meta {
-    flex-grow: 1;
-}
-.gomobd-review-section .gomobd-review-name {
-    font-size: 16px;
-    margin: 0;
-    color: #222;
-}
-.gomobd-review-section .gomobd-review-date {
-    font-size: 13px;
-    color: #888;
-}
-
-/* Stars */
-.gomobd-review-section .gomobd-review-stars {
-    color: #f8b400;
-    font-size: 15px;
-}
-
-/* Review Text */
-.gomobd-review-section .gomobd-review-body {
-    margin-top: 10px;
-    color: #555;
-    font-size: 15px;
-    line-height: 1.6;
-}
-
-/* Empty state */
-.gomobd-review-section .gomobd-review-empty {
-    background: #f9f9f9;
-    border-radius: 10px;
-    color: #777;
-}
-
-/* ✅ Simple Wholesale Pricing Styles */
-.wholesale-tier-row:hover {
-    background: #f0f8f0 !important;
-}
-
-.wholesale-tier-row.active-tier {
-    background: #d4edda !important;
-    border-left: 3px solid #28a745 !important;
-}
-</style>
+{!! app(\App\Services\ProductSchemaService::class)->productScript($details, $reviews ?? null, route('product', $details->slug)) !!}
 @endpush
 
 @section('content')
-<div class="homeproduct main-details-page">
-    <div class="container">
-        <div class="row">
-            <div class="col-sm-12">
-                <section class="product-section">
-                    <div class="container">
-                        <div class="row">
-                            <div class="col-sm-6 position-relative">
-                                @if($details->old_price)
-                                <div class="product-details-discount-badge">
-                                    <div class="sale-badge">
-                                        <div class="sale-badge-inner">
-                                            <div class="sale-badge-box">
-                                                <span class="sale-badge-text">
-                                                    <p> @php $discount=(((($details->old_price)-($details->new_price))*100) / ($details->old_price)) @endphp {{ number_format($discount, 0) }}%</p>
-                                                    ছাড়
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                @endif
-                                <div class="details_slider owl-carousel" id="details_slider_main">
-                                    @foreach ($details->images as $value)
-                                        <div class="dimage_item" data-color-id="{{ $value->color_id ?? '' }}">
-                                            <img src="{{ asset($value->image) }}" class="block__pic" />
-                                        </div>
-                                    @endforeach
-                                </div>
-                                <div
-                                    class="indicator_thumb @if ($details->images->count() > 4) thumb_slider owl-carousel @endif" id="indicator_thumb_wrapper">
-                                    @foreach ($details->images as $key => $image)
-                                        <div class="indicator-item" data-id="{{ $key }}" data-color-id="{{ $image->color_id ?? '' }}">
-                                            <img src="{{ asset($image->image) }}" />
-                                        </div>
-                                    @endforeach
-                                </div>
-                            </div>
-                            <div class="col-sm-6">
-                                <div class="details_right">
-                                    <div class="breadcrumb">
-                                        <ul>
-                                            <li><a href="{{ url('/') }}">Home</a></li>
-                                            <li><span>/</span></li>
-                                            <li><a
-                                                    href="{{ url('/category/' . $details->category->slug) }}">{{ $details->category->name }}</a>
-                                            </li>
-                                            @if ($details->subcategory)
-                                                <li><span>/</span></li>
-                                                <li><a
-                                                        href="#">{{ $details->subcategory ? $details->subcategory->subcategoryName : '' }}</a>
-                                                </li>
-                                                @endif @if ($details->childcategory)
-                                                    <li><span>/</span></li>
-                                                    <li><a
-                                                            href="#">{{ $details->childcategory->childcategoryName }}</a>
-                                                    </li>
-                                                @endif
-                                        </ul>
-                                    </div>
 
-                                    <div class="product">
-                                        <div class="product-cart">
-                                            <p class="name">{{ $details->name }}</p>
-                                            <p class="details-price">
-                                                @if ($details->old_price)
-                                                    <del>৳{{ $details->old_price }}</del>
-                                                @endif <span id="newPrice">৳{{ $details->new_price }}</span>
+@php
+    $pdOff = (!empty($details->old_price) && $details->old_price > $details->new_price)
+        ? round((($details->old_price - $details->new_price) * 100) / $details->old_price) : 0;
+    $pdRating = $reviews->count() ? (int) round($reviews->avg('ratting')) : 0;
+    $pdStock = (int) ($details->stock ?? 0);
+    $pdHasStock = $pdStock > 0;
+@endphp
 
-                                            </p>
-                                            <div class="details-ratting-wrapper">
-                                            @php
-                                                $averageRating = $reviews->avg('ratting');
-                                                $filledStars = floor($averageRating);
-                                                $emptyStars = 5 - $filledStars;
-                                            @endphp
-                                            
-                                            @if ($averageRating >= 0 && $averageRating <= 5)
-                                                @for ($i = 1; $i <= $filledStars; $i++)
-                                                    <i class="fas fa-star"></i>
-                                                @endfor
-                                            
-                                                @if ($averageRating == $filledStars)
-                                                    {{-- If averageRating is an integer, don't display half star --}}
-                                                @else
-                                                    <i class="far fa-star-half-alt"></i>
-                                                @endif
-                                            
-                                                @for ($i = 1; $i <= $emptyStars; $i++)
-                                                    <i class="far fa-star"></i>
-                                                @endfor
-                                            
-                                                <span>{{ number_format($averageRating, 2) }}/5</span>
-                                            @else
-                                                <span>Invalid rating range</span>
-                                            @endif
-                                            <a class="all-reviews-button" href="#writeReview">See Reviews</a>
-                                            </div>
-                                            <div class="product-code">
-                                                <p><span>প্রোডাক্ট কোড : </span>{{ $details->product_code }}</p>
-                                            </div>
+<div class="sf-page">
+    <div class="sf-container">
 
-                                            {{-- ⭐⭐ এখানে Product Type দেখানো হচ্ছে ⭐⭐ --}}
-                                            @php
-                                                $productTypeText = $details->is_digital
-                                                    ? 'Digital'
-                                                    : 'Physical';
-                                            @endphp
-                                            <div class="pro_brand">
-                                                <p>
-                                                  Product Type: {{ $productTypeText }}
-                                                </p>
-                                            </div>
-                                            {{-- ⭐⭐ Product Type End ⭐⭐ --}}
+        <nav class="sf-breadcrumb" aria-label="Breadcrumb">
+            <a href="{{ route('home') }}">Home</a><i class="fa-solid fa-angle-right"></i>
+            @if(!empty($details->category))<a href="{{ route('category', $details->category->slug) }}">{{ $details->category->name }}</a><i class="fa-solid fa-angle-right"></i>@endif
+            @if(!empty($details->subcategory))<a href="{{ route('subcategory', $details->subcategory->slug) }}">{{ $details->subcategory->subcategoryName }}</a><i class="fa-solid fa-angle-right"></i>@endif
+            <span class="cur">{{ Str::limit($details->name, 50) }}</span>
+        </nav>
 
-                                            {{-- ⭐⭐ Wholesale Pricing Tiers - Simple Clean Design ⭐⭐ --}}
-                                            @if($details->is_wholesale && $details->wholesalePrices && $details->wholesalePrices->count() > 0)
-                                            <div class="wholesale-pricing-section" style="margin: 20px 0;">
-                                                <h5 style="margin-bottom: 15px; font-size: 16px; font-weight: 600; color: #333;">
-                                                    <i class="fa fa-tag me-2"></i> Wholesale Pricing
-                                                </h5>
-                                                <div class="table-responsive">
-                                                    <table class="table table-bordered table-hover mb-0" style="background: #fff;">
-                                                        <thead style="background: #f8f9fa;">
-                                                            <tr>
-                                                                <th style="padding: 12px; font-size: 14px; font-weight: 600;">Quantity</th>
-                                                                <th style="padding: 12px; font-size: 14px; font-weight: 600;">Price</th>
-                                                                <th style="padding: 12px; font-size: 14px; font-weight: 600;">Stock</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            @foreach($details->wholesalePrices->sortBy('min_quantity') as $tier)
-                                                            <tr class="wholesale-tier-row" 
-                                                                data-min-qty="{{ $tier->min_quantity }}" 
-                                                                data-max-qty="{{ $tier->max_quantity ?? 999999 }}" 
-                                                                data-price="{{ $tier->wholesale_price }}"
-                                                                style="cursor: pointer; transition: background 0.2s;">
-                                                                <td style="padding: 12px; font-size: 14px;">
-                                                                    {{ $tier->min_quantity }}{{ $tier->max_quantity ? ' - ' . $tier->max_quantity : '+' }} pcs
-                                                                </td>
-                                                                <td style="padding: 12px; font-size: 14px; font-weight: 600; color: #28a745;">
-                                                                    ৳{{ number_format($tier->wholesale_price, 2) }}
-                                                                </td>
-                                                                <td style="padding: 12px; font-size: 14px; color: {{ ($tier->stock ?? 0) > 0 ? '#28a745' : '#dc3545' }};">
-                                                                    {{ $tier->stock ?? 0 }} pcs
-                                                                </td>
-                                                            </tr>
-                                                            @endforeach
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                                <p class="text-muted mt-2 mb-0" style="font-size: 12px;">
-                                                    <i class="fa fa-info-circle me-1"></i> Quantity select করলে wholesale price automatically apply হবে
-                                                </p>
-                                            </div>
-                                            @endif
-                                            {{-- ⭐⭐ Wholesale Pricing End ⭐⭐ --}}
+        <div class="sf-pd">
+            <div class="sf-pd__grid">
 
-                                            <form action="{{ route('cart.store') }}" method="POST" name="formName">
-                                                @csrf
-                                                <input type="hidden" name="id" value="{{ $details->id }}" />
-
-
-{{-- ✅ Variant-based Color & Size (with your old design style) --}}
-@if ($details->variantPrices->count() > 0)
-    @php
-        $productcolors = $details->variantPrices->pluck('color')->unique('id')->filter();
-        $productsizes = $details->variantPrices->pluck('size')->unique('id')->filter();
-    @endphp
-
-    {{-- 🎨 Color Section --}}
-    @if ($productcolors->count() > 0)
-        <div class="pro-color" style="width: 100%;">
-            <div class="color_inner">
-                <p>Color -</p>
-                <div class="size-container">
-                    <div class="selector">
-                        @foreach ($productcolors as $procolor)
-                            <div class="selector-item">
-                                {{-- ✅ এখন color_id পাঠানো হচ্ছে (নাম নয়) --}}
-                                <input type="radio"
-                                    id="fc-option{{ $procolor->id }}"
-                                    value="{{ $procolor->id }}"
-                                    name="product_color"
-                                    class="selector-item_radio emptyalert"
-                                    required />
-                                <label for="fc-option{{ $procolor->id }}"
-                                    style="background-color: {{ $procolor->color ?? '#ccc' }}"
-                                    class="selector-item_label">
-                                    <span>
-                                        <img src="{{ asset('public/frontEnd/images/check-icon.svg') }}" alt="Checked Icon" />
-                                    </span>
-                                </label>
-                            </div>
-                        @endforeach
+                {{-- ============ GALLERY ============ --}}
+                <div class="sf-pd__gallery">
+                    <div class="sf-pd__mainimg">
+                        @if($pdOff > 0)<span class="sf-off-badge">-{{ $pdOff }}%</span>@endif
+                        <img id="sfMainImg" src="{{ asset(optional($details->images->first())->image ?? optional($details->image)->image ?? 'public/logo.png') }}" alt="{{ $details->name }}" />
                     </div>
+                    @if($details->images->count() > 1)
+                        <div class="sf-pd__thumbs" id="sfThumbs">
+                            @foreach($details->images as $key => $image)
+                                <button type="button" data-thumb data-full="{{ asset($image->image) }}" data-color-id="{{ $image->color_id ?? '' }}" class="{{ $loop->first ? 'active' : '' }}">
+                                    <img src="{{ asset($image->image) }}" alt="Thumb {{ $key + 1 }}" />
+                                </button>
+                            @endforeach
+                        </div>
+                    @endif
                 </div>
-            </div>
-        </div>
-    @endif
 
-    {{-- 📏 Size Section --}}
-    @if ($productsizes->count() > 0)
-        <div class="pro-size" style="width: 100%;">
-            <div class="size_inner">
-                <p>Size & Variant - <span class="attibute-name"></span></p>
-                <div class="size-container">
-                    <div class="selector">
-                                @foreach ($productsizes as $prosize)
+                {{-- ============ INFO / BUY BOX ============ --}}
+                <div>
+                    <h1 class="sf-pd__name">{{ $details->name }}</h1>
+
+                    <div class="sf-pd__meta">
+                        <span class="sf-stars">
+                            @for($i = 1; $i <= 5; $i++)<i class="fa-solid fa-star {{ $i <= $pdRating ? 'on' : '' }}"></i>@endfor
+                        </span>
+                        <a href="#writeReview">{{ number_format($reviews->avg('ratting') ?? 0, 1) }} ({{ $reviews->count() }} reviews)</a>
+                        @if($details->product_code)<span><i class="fa-solid fa-qrcode"></i> SKU: {{ $details->product_code }}</span>@endif
+                        <span><i class="fa-solid fa-box"></i> {{ $details->is_digital ? 'Digital' : 'Physical' }} Product</span>
+                    </div>
+
+                    <div class="sf-pd__pricebar">
+                        <span class="sf-price" id="newPrice"><span class="cur">৳</span>{{ number_format((float) $details->new_price) }}</span>
+                        @if($pdOff > 0)
+                            <span class="sf-old-price">৳{{ number_format((float) $details->old_price) }}</span>
+                            <span class="sf-badge sf-badge--accent">Save ৳{{ number_format((float) ($details->old_price - $details->new_price)) }}</span>
+                        @endif
+                        <span class="sf-pd__stock {{ $pdHasStock ? 'in' : 'out' }}">
+                            <i class="fa-solid fa-circle" style="font-size:8px;margin-right:4px"></i>
+                            {{ $pdHasStock ? 'In Stock' : 'Out of Stock' }}
+                        </span>
+                    </div>
+
+                    <div class="sf-pd__points">
+                        <span><i class="fa-solid fa-check"></i>Cash on Delivery available</span>
+                        <span><i class="fa-solid fa-check"></i>{{ $details->is_digital ? 'Instant download after payment' : 'Delivery within 24–72 hours' }}</span>
+                        @if(!empty($details->brand))<span><i class="fa-solid fa-check"></i>Brand: {{ $details->brand->name }}</span>@endif
+                    </div>
+
+                    <form action="{{ route('cart.store') }}" method="POST" name="formName">
+                        @csrf
+                        <input type="hidden" name="id" value="{{ $details->id }}" />
+                        @if($details->pro_unit)<input type="hidden" name="pro_unit" value="{{ $details->pro_unit }}" />@endif
+
+                        @if($details->variantPrices && $details->variantPrices->count() > 0)
                             @php
-                                $sizeStock = $details->variantPrices->where('size_id', $prosize->id)->sum(function ($variant) {
-                                    return $variant->stock !== null ? (int) $variant->stock : 0;
-                                });
-                                $hasSizeStock = $details->variantPrices->where('size_id', $prosize->id)->contains(function ($variant) {
-                                    return $variant->stock !== null;
-                                });
+                                $productcolors = $details->variantPrices->pluck('color')->unique('id')->filter();
+                                $productsizes = $details->variantPrices->pluck('size')->unique('id')->filter();
                             @endphp
-                            <div class="selector-item">
-                                <input type="radio"
-                                    id="f-option{{ $prosize->id }}"
-                                    value="{{ $prosize->id }}"
-                                    name="product_size"
-                                    class="selector-item_radio emptyalert"
-                                    {{ $hasSizeStock && $sizeStock <= 0 ? 'disabled' : '' }}
-                                    required />
-                                <label for="f-option{{ $prosize->id }}" class="selector-item_label {{ $hasSizeStock && $sizeStock <= 0 ? 'text-decoration-line-through opacity-50' : '' }}">
-                                    {{ $prosize->sizeName ?? $prosize->name }}
-                                    @if($hasSizeStock)
-                                        <small class="d-block {{ $sizeStock > 0 ? 'text-success' : 'text-danger' }}">{{ $sizeStock > 0 ? $sizeStock.' টি আছে' : 'স্টক শেষ' }}</small>
-                                    @endif
-                                </label>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
-            </div>
-        </div>
-    @endif
-@endif
 
-
-
-
-
-                                                        @if ($details->pro_unit)
-                                                            <div class="pro_unig">
-                                                                <label>Unit: {{ $details->pro_unit }}</label>
-                                                                <input type="hidden" name="pro_unit"
-                                                                    value="{{ $details->pro_unit }}" />
-                                                            </div>
-                                                        @endif
-                                                        <div class="pro_brand">
-                                                            <p>Brand :
-                                                                {{ $details->brand ? $details->brand->name : 'N/A' }}
-                                                            </p>
-                                                        </div>
-
-                                                        <div class="row">
-                                                            <div class="qty-cart col-sm-12">
-                                                                <div class="quantity">
-                                                                    <span class="minus">-</span>
-                                                                    <input type="text" name="qty"
-                                                                        value="1" />
-                                                                    <span class="plus">+</span>
-                                                                </div>
-                                                            </div>
-                                                            <div class="d-flex single_product col-sm-12">
-                                                  <input type="submit" class="btn px-4 add_cart_btn cart_store" data-id="{{ $details->id }}" onclick="return sendSuccess();" name="add_cart" value="কার্টে যোগ করুন" />
-<input type="submit" class="btn px-4 order_now_btn order_now_btn_m" onclick="return sendSuccess();" name="order_now" value="অর্ডার করুন" />
-                                                            </div>
-                                                        </div>
-                                                        <div class="mt-md-2 mt-2">
-                                                            <h4 class="font-weight-bold">
-                                                                <a class="btn btn-success w-100 call_now_btn"
-                                                                    href="tel: {{ $contact->hotline }}">
-                                                                    <i class="fa fa-phone-square"></i>
-                                                                    {{ $contact->hotline }}
-                                                                </a>
-                                                            </h4>
-                                                        </div>
-                                                       <div class="mt-md-2 mt-2">
-                                                        <h4 class="font-weight-bold">
-                                                            <a class="btn btn-success w-100 call_now_btn"
-                                                                href="https://api.whatsapp.com/send?phone={{ $contact->whatsapp }}&text=হ্যালো, আমি এই পণ্যটির ব্যাপারে জানতে চাই: {{ urlencode(Request::url()) }}"
-                                                                target="_blank">
-                                                                <i class="fa fa-whatsapp"></i>
-                                                                এই পণ্যটি সম্পর্কে জিজ্ঞাসা করুন
-                                                            </a>
-                                                        </h4>
-                                                    </div>
-
-                                                        <div class="mt-md-2 mt-2">
-                                                            <div class="del_charge_area">
-                                                                <div class="alert alert-info text-xs">
-                                                                    <div class="flext_area">
-                                                                        <i class="fa-solid fa-cubes"></i>
-                                                                        <div>
-
-                                                                            @foreach ($shippingcharge as $key => $value)
-                                                                                <span>{{ $value->name }} <br /></span>
-                                                                            @endforeach
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                     
-                                            </form>
-
-
-                                        </div>
+                            @if($productcolors->count())
+                                <div class="sf-pd__var">
+                                    <label>Color <span class="sf-faint">— pick one</span></label>
+                                    <div class="sf-opt-group">
+                                        @foreach($productcolors as $procolor)
+                                            <label class="sf-opt is-swatch" title="{{ $procolor->colorName }}">
+                                                <input type="radio" name="product_color" value="{{ $procolor->id }}" style="display:none" />
+                                                <i style="background:{{ $procolor->color ?? '#ccc' }}"></i>
+                                            </label>
+                                        @endforeach
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="description-nav-wrapper">
-    <div class="container">
-        <div class="row">
-
-            <div class="col-sm-12">
-                <div class="description-nav">
-                    <ul class="desc-nav-ul">
-                        {{-- <li class="active">
-                            <a href="#specification" target="_self">Specification</a>
-                        </li> --}}
-                        <li>
-                            <a href="#description" target="_self">Description</a>
-                        </li>
-                        {{-- <li>
-                            <a href="#question" target="_self">Questions (0)</a>
-                        </li> --}}
-                        <li>
-                            <a href="#writeReview" target="_self">Reviews ({{ $reviews->count() }}) </a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<section class="pro_details_area">
-    <div class="container">
-        <div class="row">
-            <div class="col-sm-8">
-                <div class="description tab-content details-action-box" id="description">
-                    <h2>বিস্তারিত</h2>
-                    <p>{!! $details->description !!}</p>
-                </div>
-                <div class="tab-content details-action-box" id="writeReview">
-                    <div class="container">
-                        <div class="row">
-                            <div class="col-sm-12">
-                                
-							  
-							  
-							  
-							<section class="gomobd-review-section mt-5" id="writeReview">
-    <div class="gomobd-review-header d-flex justify-content-between align-items-center mb-3 flex-wrap">
-        <h3 class="gomobd-review-title fw-bold mb-2 mb-md-0">
-            Customer Reviews ({{ $reviews->count() }})
-        </h3>
-        <button type="button" class="gomobd-review-btn btn btn-success btn-sm"
-            data-bs-toggle="modal" data-bs-target="#exampleModal">
-            <i class="fa fa-edit me-1"></i> Write a Review
-        </button>
-    </div>
-
-    @if ($reviews->count() > 0)
-    <div class="gomobd-review-list row g-3">
-        @foreach ($reviews as $review)
-        <div class="col-12">
-            <div class="gomobd-review-card shadow-sm">
-                <div class="gomobd-review-card-header d-flex justify-content-between align-items-start flex-wrap">
-                    <div class="d-flex align-items-center">
-                        <div class="gomobd-review-avatar">
-                            {{ strtoupper(substr($review->name, 0, 1)) }}
-                        </div>
-                        <div class="gomobd-review-meta">
-                            <h6 class="gomobd-review-name">{{ $review->name }}</h6>
-                            <small class="gomobd-review-date">{{ $review->created_at->format('d M Y') }}</small>
-                        </div>
-                    </div>
-                    <div class="gomobd-review-stars">
-                        @for ($i = 1; $i <= 5; $i++)
-                            @if ($i <= $review->ratting)
-                                <i class="fa-solid fa-star"></i>
-                            @else
-                                <i class="fa-regular fa-star"></i>
                             @endif
-                        @endfor
+
+                            @if($productsizes->count())
+                                <div class="sf-pd__var">
+                                    <label>Size <span class="sf-faint">— pick one</span></label>
+                                    <div class="sf-opt-group">
+                                        @foreach($productsizes as $prosize)
+                                            @php
+                                                $sizeStock = $details->variantPrices->where('size_id', $prosize->id)->sum(fn($v) => $v->stock !== null ? max(0, (int) $v->stock) : 0);
+                                                $hasSizeStock = $details->variantPrices->where('size_id', $prosize->id)->contains(fn($v) => $v->stock !== null);
+                                                $sizeOut = $hasSizeStock && $sizeStock <= 0;
+                                            @endphp
+                                            <label class="sf-opt {{ $sizeOut ? 'is-disabled' : '' }}" style="{{ $sizeOut ? 'opacity:.4;pointer-events:none;text-decoration:line-through' : '' }}">
+                                                <input type="radio" name="product_size" value="{{ $prosize->id }}" {{ $sizeOut ? 'disabled' : '' }} style="display:none" />
+                                                {{ $prosize->sizeName ?? $prosize->name }}
+                                                @if($hasSizeStock && !$sizeOut)<small style="display:block;font-size:10px;color:#087a45;font-weight:700">{{ $sizeStock }} available</small>@endif
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
+                        @endif
+
+                        {{-- Wholesale tiers --}}
+                        @if($details->is_wholesale && $details->wholesalePrices && $details->wholesalePrices->count() > 0)
+                            <div class="sf-pd__var">
+                                <label><i class="fa-solid fa-tags" style="color:var(--c-green);margin-right:6px"></i>Wholesale Pricing <span class="sf-faint">— price applies automatically</span></label>
+                                <div class="sf-card-surface" style="overflow:hidden">
+                                    <table style="width:100%;border-collapse:collapse;font-size:13px">
+                                        <thead>
+                                            <tr style="background:#f8f9fc;color:var(--c-faint);text-transform:uppercase;font-size:10.5px;letter-spacing:.6px">
+                                                <th style="padding:10px 12px;text-align:left">Quantity</th>
+                                                <th style="padding:10px 12px;text-align:left">Unit Price</th>
+                                                <th style="padding:10px 12px;text-align:left">Stock</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($details->wholesalePrices->sortBy('min_quantity') as $tier)
+                                                <tr class="wholesale-tier-row" data-min-qty="{{ $tier->min_quantity }}" data-max-qty="{{ $tier->max_quantity ?? 999999 }}" data-price="{{ $tier->wholesale_price }}" style="border-top:1px solid var(--c-line)">
+                                                    <td style="padding:10px 12px;font-weight:700">{{ $tier->min_quantity }}{{ $tier->max_quantity ? ' – ' . $tier->max_quantity : '+' }} pcs</td>
+                                                    <td style="padding:10px 12px;color:#087a45;font-weight:800">৳{{ number_format($tier->wholesale_price) }}</td>
+                                                    <td style="padding:10px 12px;color:{{ ($tier->stock ?? 0) > 0 ? '#087a45' : 'var(--c-accent)' }}">{{ $tier->stock ?? 0 }} pcs</td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        @endif
+
+                        {{-- Actions --}}
+                        <div class="sf-pd__actions">
+                            <div class="sf-qty" style="flex-shrink:0">
+                                <button type="button" data-qty="minus">−</button>
+                                <input type="text" name="qty" value="1" min="1" />
+                                <button type="button" data-qty="plus">+</button>
+                            </div>
+                            @if($pdHasStock)
+                                <button type="submit" name="add_cart" class="sf-btn sf-btn--dark cart_store" data-id="{{ $details->id }}" onclick="return pdValidate()">
+                                    <i class="fa-solid fa-cart-plus"></i> Add to Cart
+                                </button>
+                                <button type="submit" name="order_now" class="sf-btn sf-btn--primary" onclick="return pdValidate()">
+                                    <i class="fa-solid fa-bolt"></i> Order Now
+                                </button>
+                            @else
+                                <button type="button" class="sf-btn sf-btn--outline" disabled style="flex:1"><i class="fa-solid fa-ban"></i> Out of Stock</button>
+                            @endif
+                        </div>
+                    </form>
+
+                    {{-- Call / WhatsApp --}}
+                    <div style="display:flex;gap:10px;flex-wrap:wrap">
+                        @if(!empty(optional($contact)->hotline))
+                            <a class="sf-btn sf-btn--green sf-btn--sm" href="tel:{{ $contact->hotline }}"><i class="fa-solid fa-phone"></i> Call: {{ $contact->hotline }}</a>
+                        @endif
+                        @if(!empty(optional($contact)->whatsapp))
+                            <a class="sf-btn sf-btn--outline sf-btn--sm" href="https://api.whatsapp.com/send?phone={{ $contact->whatsapp }}&text=Hello, I want to know more about this product: {{ urlencode(Request::url()) }}" target="_blank" rel="noopener"><i class="fab fa-whatsapp" style="color:#25D366"></i> Ask on WhatsApp</a>
+                        @endif
                     </div>
-                </div>
-                <div class="gomobd-review-body mt-2">
-                    <p><i class="fa-regular fa-comment-dots text-success me-1"></i> {{ $review->review }}</p>
+
+                    @if(($shippingcharge ?? collect())->count())
+                        <div style="margin-top:14px;padding:12px 14px;background:var(--c-primary-50);border-radius:var(--r-sm);font-size:12.5px;font-weight:600;color:var(--c-primary)">
+                            <i class="fa-solid fa-cubes"></i>
+                            @foreach($shippingcharge as $value)
+                                {{ $value->name }}@if(!$loop->last) · @endif
+                            @endforeach
+                        </div>
+                    @endif
+
+                    <div class="sf-pd__trust">
+                        <div><i class="fa-solid fa-rotate-left"></i>7-Day Return</div>
+                        <div><i class="fa-solid fa-shield-halved"></i>Secure Payment</div>
+                        <div><i class="fa-solid fa-truck-fast"></i>Fast Delivery</div>
+                    </div>
                 </div>
             </div>
         </div>
-        @endforeach
-    </div>
-    @else
-    <div class="gomobd-review-empty text-center py-5">
-        <i class="fa fa-clipboard-list fs-1 text-muted mb-3"></i>
-        <p>This product has no reviews yet.<br><strong>Be the first one to write a review.</strong></p>
-    </div>
-    @endif
-</section>
 
-
-							  
-							  
-							  
-							  
-							  
-							  
-							  
-                                <div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel"
-                                    aria-hidden="true">
-                                    <div class="modal-dialog modal-dialog-centered">
-                                        <div class="modal-content">
-                                            <div class="modal-header">
-                                                <h1 class="modal-title fs-5" id="exampleModalLabel">Your review</h1>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                                    aria-label="Close"></button>
-                                            </div>
-                                            <div class="modal-body">
-                                                <div class="insert-review">
-                                                    @if (Auth::guard('customer')->user())
-                                                        <form action="{{ route('customer.review') }}" id="review-form"
-                                                            method="POST">
-                                                            @csrf
-                                                            <input type="hidden" name="product_id" value="{{ $details->id }}">
-                                                            <div class="fz-12 mb-2">
-                                                                <div class="rating">
-                                                                    <label title="Excelent">
-                                                                        ☆
-                                                                        <input required type="radio" name="ratting"
-                                                                            value="5" />
-                                                                    </label>
-                                                                    <label title="Best">
-                                                                        ☆
-                                                                        <input required type="radio" name="ratting"
-                                                                            value="4" />
-                                                                    </label>
-                                                                    <label title="Better">
-                                                                        ☆
-                                                                        <input required type="radio" name="ratting"
-                                                                            value="3" />
-                                                                    </label>
-                                                                    <label title="Very Good">
-                                                                        ☆
-                                                                        <input required type="radio" name="ratting"
-                                                                            value="2" />
-                                                                    </label>
-                                                                    <label title="Good">
-                                                                        ☆
-                                                                        <input required type="radio" name="ratting"
-                                                                            value="1" />
-                                                                    </label>
-                                                                </div>
-                                                            </div>
-                
-                                                            <div class="form-group">
-                                                                <label for="message-text" class="col-form-label">Message:</label>
-                                                                <textarea required class="form-control radius-lg" name="review" id="message-text"></textarea>
-                                                                <span id="validation-message" style="color: red;"></span>
-                                                            </div>
-                                                            <div class="form-group">
-                                                                <button class="details-review-button" type="submit">Submit
-                                                                    Review</button>
-                                                            </div>
-                
-                                                        </form>
-                                                    @else
-                                                        <a class="customer-login-redirect" href="{{ route('customer.login') }}">Login
-                                                            to Post
-                                                            Your Review</a>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+        {{-- ============ TABS ============ --}}
+        <div class="sf-tabs sf-card-surface">
+            <div class="sf-tabs__nav" style="padding:0 16px">
+                <button type="button" class="active" data-tab="pdDescription">Description</button>
+                <button type="button" data-tab="pdVideo" @if(empty($videoType)) style="display:none" @endif>Video</button>
+                <button type="button" data-tab="pdReviews">Reviews ({{ $reviews->count() }})</button>
             </div>
+
+            <div class="sf-tabs__pane active" id="pdDescription">
+                <div class="sf-prose">{!! $details->description !!}</div>
+            </div>
+
             @php
                 $videoType = $details->pro_video_type ?? ($details->pro_video ? 'youtube' : null);
                 $hasVideo = ($videoType === 'youtube' && $details->pro_video) || ($videoType === 'upload' && $details->pro_video_path);
             @endphp
-            @if($hasVideo)
-            <div class="col-sm-4">
-                <div class="pro_vide">
-                    <h2>ভিডিও</h2>
+            <div class="sf-tabs__pane" id="pdVideo">
+                @if($hasVideo)
                     @if($videoType === 'youtube' && $details->pro_video)
-                    <iframe width="100%" height="315"
-                        src="https://www.youtube.com/embed/{{ $details->pro_video }}" title="YouTube video player"
-                        frameborder="0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                        allowfullscreen></iframe>
+                        <iframe width="100%" height="420" style="border-radius:12px;border:0" src="https://www.youtube.com/embed/{{ $details->pro_video }}" allowfullscreen></iframe>
                     @elseif($videoType === 'upload' && $details->pro_video_path)
-                    <video width="100%" height="315" controls style="border-radius:8px;background:#000;">
-                        <source src="{{ asset($details->pro_video_path) }}" type="video/mp4">
-                        <source src="{{ asset($details->pro_video_path) }}" type="video/webm">
-                        <source src="{{ asset($details->pro_video_path) }}" type="video/ogg">
-                        আপনার ব্রাউজার ভিডিও সাপোর্ট করে না।
-                    </video>
+                        <video width="100%" height="420" controls style="border-radius:12px;background:#000">
+                            <source src="{{ asset($details->pro_video_path) }}" type="video/mp4">
+                        </video>
                     @endif
-                </div>
+                @else
+                    <div class="sf-empty"><i class="fa-solid fa-video"></i><h4>No video available</h4></div>
+                @endif
             </div>
-            @endif
-        </div>
-    </div>
-</section>
 
-<section class="related-product-section">
-    <div class="container">
-        <div class="row">
-            <div class="related-title">
-                <h5>Related Product</h5>
+            <div class="sf-tabs__pane" id="pdReviews" style="padding:20px 24px">
+                @if($reviews->count())
+                    <div class="sf-rating-sum">
+                        <div class="sf-rating-sum__big">
+                            <b>{{ number_format($reviews->avg('ratting') ?? 0, 1) }}</b>
+                            <div class="sf-stars">
+                                @for($i = 1; $i <= 5; $i++)<i class="fa-solid fa-star {{ $i <= $pdRating ? 'on' : '' }}"></i>@endfor
+                            </div>
+                            <small>{{ $reviews->count() }} verified review(s)</small>
+                        </div>
+                        <button type="button" class="sf-btn sf-btn--dark sf-btn--sm" data-bs-toggle="modal" data-bs-target="#reviewModal">
+                            <i class="fa-regular fa-pen-to-square"></i> Write a Review
+                        </button>
+                    </div>
+                    @foreach($reviews->take(10) as $review)
+                        <div class="sf-review">
+                            <img src="{{ asset($review->image ?? 'public/uploads/default.webp') }}" alt="" onerror="this.src='{{ asset('public/logo.png') }}'" />
+                            <div class="sf-review__body">
+                                <b>{{ $review->name }}</b>
+                                <div class="sf-stars">
+                                    @for($i = 1; $i <= 5; $i++)<i class="fa-solid fa-star {{ $i <= $review->ratting ? 'on' : '' }}"></i>@endfor
+                                </div>
+                                <p>{{ $review->review }}</p>
+                                <small>{{ optional($review->created_at)->format('d M Y') }}</small>
+                            </div>
+                        </div>
+                    @endforeach
+                @else
+                    <div class="sf-empty">
+                        <i class="fa-regular fa-clipboard"></i>
+                        <h4>No reviews yet</h4>
+                        <p>Be the first one to write a review for this product.</p>
+                        <button type="button" class="sf-btn sf-btn--dark sf-btn--sm" style="margin-top:14px" data-bs-toggle="modal" data-bs-target="#reviewModal">Write a Review</button>
+                    </div>
+                @endif
             </div>
         </div>
-        <div class="row">
-            <div class="col-sm-12">
-                <div class="product-inner owl-carousel related_slider">
-                    @foreach ($products as $key => $value)
-                    <div class="product_item wist_item wow zoomIn" data-wow-duration="1.5s"
-                        data-wow-delay="0.{{ $key }}s">
 
-                        <div class="product_item_inner">
-                            @if($value->old_price)
-                            <div class="sale-badge">
-                                <div class="sale-badge-inner">
-                                    <div class="sale-badge-box">
-                                        <span class="sale-badge-text">
-                                            <p>@php $discount=(((($value->old_price)-($value->new_price))*100) / ($value->old_price)) @endphp 
-                                               {{ number_format($discount, 0) }}%</p>
-                                            ছাড়
-                                        </span>
+        {{-- Review modal --}}
+        <div class="modal fade" id="reviewModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content" style="border-radius:18px;border:0">
+                    <div class="modal-header" style="border:0">
+                        <h5 class="modal-title" style="font-weight:800">Your Review</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if(Auth::guard('customer')->user())
+                            <form action="{{ route('customer.review') }}" method="POST">
+                                @csrf
+                                <input type="hidden" name="product_id" value="{{ $details->id }}">
+                                <div class="sf-field">
+                                    <label>Rating</label>
+                                    <div style="display:flex;gap:6px">
+                                        @for($i = 5; $i >= 1; $i--)
+                                            <label style="cursor:pointer;font-size:26px;color:#e2e6ee">
+                                                <input type="radio" name="ratting" value="{{ $i }}" required style="display:none" />
+                                                <i class="fa-solid fa-star" style="pointer-events:none"></i>
+                                            </label>
+                                        @endfor
                                     </div>
                                 </div>
-                            </div>
-                            @endif
-
-                            <div class="pro_img">
-                                <a href="{{ route('product', $value->slug) }}">
-                                    <img src="{{ asset($value->image ? $value->image->image : '') }}"
-                                        alt="{{ $value->name }}" />
-                                </a>
-                            </div>
-
-                            <div class="pro_des">
-                                <div class="pro_name">
-                                    <a href="{{ route('product', $value->slug) }}">{{ Str::limit($value->name, 35) }}</a>
+                                <div class="sf-field">
+                                    <label>Your Feedback <span class="req">*</span></label>
+                                    <textarea class="sf-textarea" name="review" required placeholder="Share your experience with this product…"></textarea>
                                 </div>
-                            </div>
-                        </div>
-
-                        @php
-                            $averageRating = $value->reviews->avg('ratting'); 
-                            $filledStars = floor($averageRating);
-                            $hasHalfStar = $averageRating - $filledStars >= 0.5;
-                            $emptyStars = 5 - $filledStars - ($hasHalfStar ? 1 : 0);
-                        @endphp
-
-                        {{-- Stars --}}
-                        @for ($i = 0; $i < $filledStars; $i++)
-                            <i class="fas fa-star"></i>
-                        @endfor
-                        @if ($hasHalfStar)
-                            <i class="fas fa-star-half-alt"></i>
-                        @endif
-                        @for ($i = 0; $i < $emptyStars; $i++)
-                            <i class="far fa-star"></i>
-                        @endfor
-
-                        <div class="pro_price">
-                            <p>
-                                <del>৳ {{ $value->old_price }}</del>
-                                ৳ {{ $value->new_price }}
-                            </p>
-                        </div>
-
-                        {{-- ⭐⭐⭐ BUTTON AREA (Added) ⭐⭐⭐ --}}
-                        @if (!$value->prosizes->isEmpty() || !$value->procolors->isEmpty())
-                        {{-- ভ্যারিয়েন্ট আছে = দুই বাটনই product details page এ যাবে --}}
-                        <div class="pro_btn">
-
-                            <a href="{{ route('product', $value->slug) }}" 
-                                data-id="{{ $value->id }}"
-                                class="order-btn-link order-btn qo-order-link">
-                                অর্ডার করুন
-                            </a>
-
-                            <a href="{{ route('product', $value->slug) }}" 
-                                data-id="{{ $value->id }}"
-                                class="cart-icon-link cart-icon-btn qo-cart-link">
-                                <i class="fa-solid fa-cart-shopping"></i>
-                            </a>
-
-                        </div>
-
+                                <button type="submit" class="sf-btn sf-btn--primary sf-btn--block">Submit Review</button>
+                            </form>
                         @else
-                        {{-- ভ্যারিয়েন্ট নেই = Order Now + Add to Cart --}}
-                        <div class="pro_btn">
-
-                            {{-- Order Now --}}
-                            <form action="{{ route('cart.store') }}" method="POST">
-                                @csrf
-                                <input type="hidden" name="id" value="{{ $value->id }}">
-                                <input type="hidden" name="qty" value="1">
-                                <input type="hidden" name="order_now" value="1">
-
-                                <button type="submit" class="order-btn">
-                                    অর্ডার করুন
-                                </button>
-                            </form>
-
-                            {{-- Add to Cart --}}
-                            <form action="{{ route('cart.store') }}" method="POST">
-                                @csrf
-                                <input type="hidden" name="id" value="{{ $value->id }}">
-                                <input type="hidden" name="qty" value="1">
-
-                                <button type="submit" class="cart-icon-btn cart_store" data-id="{{ $value->id }}">
-                                    <i class="fa-solid fa-cart-shopping"></i>
-                                </button>
-                            </form>
-
-                        </div>
+                            <div class="sf-empty" style="padding:30px 10px">
+                                <i class="fa-solid fa-user-lock"></i>
+                                <h4>Login to review</h4>
+                                <a class="sf-btn sf-btn--dark" style="margin-top:12px" href="{{ route('customer.login') }}">Login / Register</a>
+                            </div>
                         @endif
-
                     </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- ============ RELATED ============ --}}
+        @if(($products ?? collect())->count())
+            <div class="sf-sec-head">
+                <div>
+                    <h2 class="sf-sec-head__ttl">Related Products</h2>
+                    <p class="sf-sec-head__sub">You may also like these</p>
+                </div>
+            </div>
+            <div class="sf-owl-nav">
+                <div class="owl-carousel related_slider">
+                    @foreach($products as $product)
+                        <div style="padding:4px">
+                            @include('frontEnd.layouts.partials.product-card', ['product' => $product])
+                        </div>
                     @endforeach
                 </div>
             </div>
-        </div>
+        @endif
+
     </div>
-</section>
+</div>
+@endsection
 
-
-@endsection @push('script')
-<script src="{{ asset('public/frontEnd/js/owl.carousel.min.js') }}"></script>
-
-<script src="{{ asset('public/frontEnd/js/zoomsl.min.js') }}"></script>
+@push('script')
 <script>
+    /* ---------- Variant price update ---------- */
     const variants = @json($details->variantPrices);
-
-    @if($details->is_wholesale && $details->wholesalePrices && $details->wholesalePrices->count() > 0)
-    var wholesaleTiers = [
-        @foreach($details->wholesalePrices->sortBy('min_quantity') as $tier)
-        {
-            min_quantity: {{ $tier->min_quantity }},
-            max_quantity: {{ $tier->max_quantity ?? 999999 }},
-            price: {{ $tier->wholesale_price }}
-        }@if(!$loop->last),@endif
-        @endforeach
-    ];
-    var regularPrice = {{ $details->new_price }};
-
-    function getWholesalePrice(qty) {
-        for (var i = 0; i < wholesaleTiers.length; i++) {
-            if (qty >= wholesaleTiers[i].min_quantity && qty <= wholesaleTiers[i].max_quantity) {
-                return wholesaleTiers[i].price;
-            }
-        }
-        return null;
-    }
-    @endif
 
     function updateVariantPrice() {
         let color = $("input[name='product_color']:checked").val() || null;
         let size  = $("input[name='product_size']:checked").val() || null;
-
         let match = null;
-
-        // ✅ color + size (both selected)
         if (color && size) {
-            match = variants.find(v => {
-                let vColorId = v.color_id ?? v.color;
-                let vSizeId = v.size_id ?? v.size;
-                return String(vColorId) == String(color) && String(vSizeId) == String(size);
-            });
+            match = variants.find(v => String(v.color_id ?? v.color) == String(color) && String(v.size_id ?? v.size) == String(size));
         }
-
-        // ✅ only color (no size selected)
         if (!match && color && !size) {
-            match = variants.find(v => {
-                let vColorId = v.color_id ?? v.color;
-                let vSizeId = v.size_id ?? v.size;
-                return String(vColorId) == String(color) && (vSizeId === null || vSizeId === '');
-            });
+            match = variants.find(v => String(v.color_id ?? v.color) == String(color) && (v.size_id === null || v.size_id === ''));
         }
-
-        // ✅ only size (no color selected)
         if (!match && size && !color) {
-            match = variants.find(v => {
-                let vColorId = v.color_id ?? v.color;
-                let vSizeId = v.size_id ?? v.size;
-                return String(vSizeId) == String(size) && (vColorId === null || vColorId === '');
-            });
+            match = variants.find(v => String(v.size_id ?? v.size) == String(size) && (v.color_id === null || v.color_id === ''));
         }
-
-        // ✅ update UI
         let basePrice = parseFloat({{ $details->new_price }});
-        if (match && match.price !== undefined && match.price !== null) {
-            // Variant price is the actual price for this color/size combination
-            basePrice = parseFloat(match.price);
-        }
+        if (match && match.price !== undefined && match.price !== null) basePrice = parseFloat(match.price);
 
-        // Apply wholesale price if applicable (wholesale price overrides variant price)
         @if($details->is_wholesale && $details->wholesalePrices && $details->wholesalePrices->count() > 0)
         let qty = parseInt($("input[name='qty']").val()) || 1;
-        let wholesalePrice = getWholesalePrice(qty);
-        if (wholesalePrice !== null) {
-            basePrice = parseFloat(wholesalePrice);
-        }
+        let tier = null;
+        @foreach($details->wholesalePrices->sortBy('min_quantity') as $tier)
+        if (qty >= {{ $tier->min_quantity }} && qty <= {{ $tier->max_quantity ?? 999999 }}) tier = {{ $tier->wholesale_price }};
+        @endforeach
+        if (tier !== null) basePrice = parseFloat(tier);
         @endif
 
-        $('#newPrice').text('৳' + basePrice.toFixed(2));
+        $('#newPrice').html('<span class="cur">৳</span>' + basePrice.toLocaleString('en-US'));
     }
-    
-    // Call on page load if color/size is already selected
-    $(document).ready(function() {
-        updateVariantPrice();
+    $(document).on('change', "input[name='product_color'], input[name='product_size']", updateVariantPrice);
+    $(document).on('change', "input[name='qty']", updateVariantPrice);
+    $(document).ready(function () { updateVariantPrice(); });
+
+    /* ---------- Color → image filter ---------- */
+    var productImages = @json($details->images->map(fn($img) => ['src' => asset($img->image), 'color_id' => $img->color_id]));
+    $(document).on('change', "input[name='product_color']", function () {
+        var colorId = $(this).val() ? String($(this).val()) : null;
+        var filtered = productImages.filter(function (img) { return img.color_id && String(img.color_id) === colorId; });
+        if (!filtered.length) filtered = productImages;
+        var main = filtered[0];
+        if (main) {
+            $('#sfMainImg').attr('src', main.src);
+            $('#sfThumbs button').removeClass('active');
+            $('#sfThumbs button[data-color-id="' + (colorId || '') + '"]').first().addClass('active');
+        }
     });
 
-    $(document).on(
-        'change',
-        "input[name='product_color'], input[name='product_size']",
-        updateVariantPrice
-    );
-
-    // কালার সিলেক্ট করলে ঐ কালারের ইমেজ দেখাবে
-    var productImages = @json($details->images->map(function($img) {
-        return ['src' => asset($img->image), 'color_id' => $img->color_id];
-    }));
-
-    function updateImagesByColor(colorId) {
-        var colorIdStr = colorId ? String(colorId) : null;
-        var filteredImages = [];
-
-        if (colorIdStr) {
-            var colorSpecific = productImages.filter(function(img) {
-                return img.color_id && String(img.color_id) === colorIdStr;
-            });
-            var defaultImages = productImages.filter(function(img) { return !img.color_id; });
-            filteredImages = colorSpecific.length > 0 ? colorSpecific : defaultImages;
-        } else {
-            filteredImages = productImages.filter(function(img) { return !img.color_id; });
-            if (filteredImages.length === 0) filteredImages = productImages;
-        }
-        if (filteredImages.length === 0) filteredImages = productImages;
-
-        var $slider = $(".details_slider");
-        var owl = $slider.data("owl.carousel");
-        if (owl) owl.destroy();
-
-        var sliderHtml = filteredImages.map(function(img, i) {
-            return '<div class="dimage_item"><img src="' + img.src + '" class="block__pic" /></div>';
-        }).join('');
-        $slider.html(sliderHtml);
-
-        var thumbHtml = filteredImages.map(function(img, i) {
-            return '<div class="indicator-item" data-id="' + i + '"><img src="' + img.src + '" /></div>';
-        }).join('');
-        var $thumbWrapper = $("#indicator_thumb_wrapper");
-        var thumbOwl = $thumbWrapper.data("owl.carousel");
-        if (thumbOwl) thumbOwl.destroy();
-        $thumbWrapper.removeClass("thumb_slider owl-carousel").html(thumbHtml);
-        if (filteredImages.length > 4) {
-            $thumbWrapper.addClass("thumb_slider owl-carousel");
-            $thumbWrapper.owlCarousel({ margin: 15, items: 4, loop: true, dots: false, nav: true, autoplayTimeout: 6000, autoplayHoverPause: true });
-        }
-
-        $slider.owlCarousel({
-            margin: 15,
-            items: 1,
-            loop: filteredImages.length > 1,
-            dots: false,
-            autoplay: true,
-            autoplayTimeout: 6000,
-            autoplayHoverPause: true,
-        });
-
-        $(".indicator-item").off("click").on("click", function() {
-            var slideIndex = parseInt($(this).data("id"), 10);
-            $slider.trigger("to.owl.carousel", slideIndex);
-        });
-
-        if ($(".block__pic").length && typeof $(".block__pic").imagezoomsl === "function") {
-            $(".block__pic").imagezoomsl({ zoomrange: [3, 3] });
-        }
+    /* ---------- Variant validation (only when options exist) ---------- */
+    function pdValidate() {
+        var sizeInputs = $("input[name='product_size']");
+        var colorInputs = $("input[name='product_color']");
+        if (sizeInputs.length && !sizeInputs.filter(':checked').length) { toastr.warning('Please select a size'); return false; }
+        if (colorInputs.length && !colorInputs.filter(':checked').length) { toastr.warning('Please select a color'); return false; }
+        return true;
     }
 
-    $(document).on("change", "input[name='product_color']", function() {
-        updateImagesByColor($(this).val() || null);
-    });
-</script>
-
-
-
-<script>
-    $(document).ready(function() {
-        $(".details_slider").owlCarousel({
-            margin: 15,
-            items: 1,
-            loop: true,
-            dots: false,
-            autoplay: true,
-            autoplayTimeout: 6000,
-            autoplayHoverPause: true,
-        });
-        $(".indicator-item").on("click", function() {
-            var slideIndex = $(this).data("id");
-            $(".details_slider").trigger("to.owl.carousel", slideIndex);
+    /* ---------- Review stars ---------- */
+    $(document).on('click', '#reviewModal .fa-star', function () {
+        var val = $(this).parent().find('input').val();
+        $('#reviewModal .fa-star').css('color', '#e2e6ee');
+        $('#reviewModal input[type=radio]').each(function () {
+            if (parseInt($(this).val()) >= parseInt(val)) $(this).siblings('i').css('color', '#F5A623');
         });
     });
-</script>
-<!--Data Layer Start-->
-<script type="text/javascript">
+
+    /* ---------- Related slider ---------- */
+    $(".related_slider").owlCarousel({
+        margin: 14, items: 5, loop: true, dots: false, nav: true, autoplay: true, autoplayTimeout: 5000, autoplayHoverPause: true,
+        navText: ["<i class='fa-solid fa-angle-left'></i>", "<i class='fa-solid fa-angle-right'></i>"],
+        responsive: { 0: { items: 2 }, 640: { items: 3 }, 992: { items: 4 }, 1200: { items: 5 } }
+    });
+
+    /* ---------- dataLayer: view_item ---------- */
     window.dataLayer = window.dataLayer || [];
-    dataLayer.push({
-        ecommerce: null
-    });
+    dataLayer.push({ ecommerce: null });
     dataLayer.push({
         event: "view_item",
         ecommerce: {
             items: [{
-                item_name: "{{ $details->name }}",
+                item_name: @json($details->name),
                 item_id: "{{ $details->id }}",
                 price: "{{ $details->new_price }}",
-                item_brand: "{{ $details->brand?$details->brand->name:'' }}",
-                item_category: "{{ $details->category->name }}",
-                item_variant: "{{ $details->pro_unit }}",
+                item_brand: @json(optional($details->brand)->name),
+                item_category: "{{ optional($details->category)->name }}",
                 currency: "BDT",
-                quantity: {{ $details->stock ?? 0 }}
-            }],
-            impression: [
-                @foreach ($products as $value)
-                    {
-                        item_name: "{{ $value->name }}",
-                        item_id: "{{ $value->id }}",
-                        price: "{{ $value->new_price }}",
-                        item_brand: "{{ $details->brand?$details->brand->name:'' }}",
-                        item_category: "{{ $value->category ? $value->category->name : '' }}",
-                        item_variant: "{{ $value->pro_unit }}",
-                        currency: "BDT",
-                        quantity: {{ $value->stock ?? 0 }}
-                    },
-                @endforeach
-            ]
+                quantity: {{ $pdStock }}
+            }]
         }
-    });
-</script>
-<script type="text/javascript">
-    $(document).ready(function() {
-        $('#add_to_cart').click(function() {
-            gtag("event", "add_to_cart", {
-                currency: "BDT",
-                value: "1.5",
-                items: [
-                    @foreach (Cart::instance('shopping')->content() as $cartInfo)
-                        {
-                            item_id: "{{$details->id}}",
-                            item_name: "{{$details->name}}",
-                            price: "{{$details->new_price}}",
-                            currency: "BDT",
-                            quantity: {{ $cartInfo->qty ?? 0 }}
-                        },
-                    @endforeach
-                ]
-            });
-        });
-    });
-</script>
-<script type="text/javascript">
-    $(document).ready(function() {
-        $('#order_now').click(function() {
-            gtag("event", "add_to_cart", {
-                currency: "BDT",
-                value: "1.5",
-                items: [
-                    @foreach (Cart::instance('shopping')->content() as $cartInfo)
-                        {
-                            item_id: "{{$details->id}}",
-                            item_name: "{{$details->name}}",
-                            price: "{{$details->new_price}}",
-                            currency: "BDT",
-                            quantity: {{ $cartInfo->qty ?? 0 }}
-                        },
-                    @endforeach
-                ]
-            });
-        });
-    });
-</script>
-
-<!-- Data Layer End-->
-
-{{-- 🔹 নতুন dataLayer + Facebook Pixel ইভেন্ট (আগের কিছু না কেটে শুধু যোগ করা) --}}
-<script type="text/javascript">
-    window.dataLayer = window.dataLayer || [];
-
-    (function () {
-
-        var productItem = {
-            item_id: "{{ $details->id }}",
-            item_name: @json($details->name),
-            price: {{ (float) $details->new_price }},
-            item_brand: @json(optional($details->brand)->name),
-            item_category: @json(optional($details->category)->name),
-            item_variant: @json($details->pro_unit),
-            currency: "BDT",
-            quantity: {{ $details->stock ?? 0 }}
-        };
-
-        var relatedItems = [
-            @foreach ($products as $value)
-            {
-                item_id: "{{ $value->id }}",
-                item_name: @json($value->name),
-                price: {{ (float) $value->new_price }},
-                item_brand: @json(optional($value->brand)->name),
-                item_category: @json(optional($value->category)->name),
-                item_variant: @json($value->pro_unit),
-                currency: "BDT",
-                quantity: {{ $value->stock ?? 0 }}
-            }@if(!$loop->last),@endif
-            @endforeach
-        ];
-
-        // view_item_list (Related products)
-        if (relatedItems.length) {
-            window.dataLayer.push({
-                event: "view_item_list",
-                ecommerce: {
-                    item_list_name: "Related Products",
-                    currency: "BDT",
-                    items: relatedItems
-                }
-            });
-        }
-
-        // Facebook Pixel: ViewContent
-        if (typeof fbq === "function") {
-            fbq("track", "ViewContent", {
-                content_ids: [productItem.item_id],
-                content_name: productItem.item_name,
-                content_category: productItem.item_category,
-                value: productItem.price,
-                currency: "BDT"
-            });
-        }
-
-        // Helper: qty সহ item তৈরি
-        function buildCurrentItem() {
-            var qtyInput = document.querySelector("input[name='qty']");
-            var qty = parseInt(qtyInput ? qtyInput.value : "1", 10);
-            if (isNaN(qty) || qty < 1) qty = 1;
-
-            return {
-                item_id: productItem.item_id,
-                item_name: productItem.item_name,
-                price: productItem.price,
-                item_brand: productItem.item_brand,
-                item_category: productItem.item_category,
-                item_variant: productItem.item_variant,
-                currency: "BDT",
-                quantity: qty
-            };
-        }
-
-        // "কার্টে যোগ করুন" -> add_to_cart + FB AddToCart
-        $(document).on("click", ".add_cart_btn", function () {
-            var item  = buildCurrentItem();
-            var value = item.price * item.quantity;
-
-            window.dataLayer.push({ ecommerce: null });
-            window.dataLayer.push({
-                event: "add_to_cart",
-                ecommerce: {
-                    currency: "BDT",
-                    value: value,
-                    items: [item]
-                }
-            });
-
-            if (typeof fbq === "function") {
-                fbq("track", "AddToCart", {
-                    content_ids: [item.item_id],
-                    content_name: item.item_name,
-                    value: value,
-                    currency: "BDT",
-                    contents: [
-                        { id: item.item_id, quantity: item.quantity }
-                    ]
-                });
-            }
-        });
-
-        // "অর্ডার করুন" -> add_to_cart + begin_checkout + FB InitiateCheckout
-        $(document).on("click", ".order_now_btn", function () {
-            var item  = buildCurrentItem();
-            var value = item.price * item.quantity;
-
-            // GA4 add_to_cart
-            window.dataLayer.push({ ecommerce: null });
-            window.dataLayer.push({
-                event: "add_to_cart",
-                ecommerce: {
-                    currency: "BDT",
-                    value: value,
-                    items: [item]
-                }
-            });
-
-            // GA4 begin_checkout
-            window.dataLayer.push({
-                event: "begin_checkout",
-                ecommerce: {
-                    currency: "BDT",
-                    value: value,
-                    items: [item]
-                }
-            });
-
-            // FB Pixel
-            if (typeof fbq === "function") {
-                fbq("track", "AddToCart", {
-                    content_ids: [item.item_id],
-                    content_name: item.item_name,
-                    value: value,
-                    currency: "BDT",
-                    contents: [
-                        { id: item.item_id, quantity: item.quantity }
-                    ]
-                });
-
-                fbq("track", "InitiateCheckout", {
-                    value: value,
-                    currency: "BDT",
-                    num_items: item.quantity
-                });
-            }
-        });
-
-    })();
-</script>
-
-<script>
-    $(document).ready(function() {
-        $(".related_slider").owlCarousel({
-            margin: 10,
-            items: 6,
-            loop: true,
-            dots: true,
-            nav: true,
-            autoplay: true,
-            autoplayTimeout: 6000,
-            autoplayHoverPause: true,
-            responsiveClass: true,
-            responsive: {
-                0: {
-                    items: 2,
-                    nav: true,
-                },
-                600: {
-                    items: 3,
-                    nav: false,
-                },
-                1000: {
-                    items: 5,
-                    nav: true,
-                    loop: true,
-                },
-            },
-        });
-        // $('.owl-nav').remove();
-    });
-</script>
-<script>
-    $(document).ready(function() {
-        $(".minus").click(function() {
-            var $input = $(this).parent().find("input");
-            var count = parseInt($input.val()) - 1;
-            count = count < 1 ? 1 : count;
-            $input.val(count);
-            $input.change();
-            return false;
-        });
-        $(".plus").click(function() {
-            var $input = $(this).parent().find("input");
-            $input.val(parseInt($input.val()) + 1);
-            $input.change();
-            return false;
-        });
-
-        // Wholesale Price Update on Quantity Change - Modern Card Design
-        @if($details->is_wholesale && $details->wholesalePrices && $details->wholesalePrices->count() > 0)
-        var wholesaleTiers = [
-            @foreach($details->wholesalePrices->sortBy('min_quantity') as $tier)
-            {
-                min_quantity: {{ $tier->min_quantity }},
-                max_quantity: {{ $tier->max_quantity ?? 999999 }},
-                price: {{ $tier->wholesale_price }}
-            }@if(!$loop->last),@endif
-            @endforeach
-        ];
-        var regularPrice = {{ $details->new_price }};
-
-        function updatePriceBasedOnQuantity() {
-            var qty = parseInt($("input[name='qty']").val()) || 1;
-            var selectedPrice = regularPrice;
-            var matchedTier = null;
-
-            // Find matching wholesale tier
-            for (var i = 0; i < wholesaleTiers.length; i++) {
-                if (qty >= wholesaleTiers[i].min_quantity && qty <= wholesaleTiers[i].max_quantity) {
-                    selectedPrice = wholesaleTiers[i].price;
-                    matchedTier = wholesaleTiers[i];
-                    break;
-                }
-            }
-
-            // Update price display
-            $('#newPrice').text('৳' + selectedPrice.toFixed(2));
-
-            // Highlight matching tier row
-            $('.wholesale-tier-row').removeClass('active-tier');
-            if (matchedTier) {
-                $('.wholesale-tier-row').each(function() {
-                    var minQty = parseInt($(this).data('min-qty'));
-                    var maxQty = parseInt($(this).data('max-qty'));
-                    if (qty >= minQty && qty <= maxQty) {
-                        $(this).addClass('active-tier');
-                    }
-                });
-            }
-        }
-
-        // Update price when quantity changes
-        $("input[name='qty']").on('change keyup', function() {
-            updatePriceBasedOnQuantity();
-        });
-
-        // Click on tier row to set quantity to minimum
-        $('.wholesale-tier-row').on('click', function() {
-            var minQty = parseInt($(this).data('min-qty'));
-            $("input[name='qty']").val(minQty).trigger('change');
-        });
-
-        // Initial price update
-        updatePriceBasedOnQuantity();
-        @endif
-    });
-</script>
-
-<script>
-    function sendSuccess() {
-        // size validation
-        size = document.forms["formName"]["product_size"].value;
-        if (size != "") {
-            // access
-        } else {
-            toastr.warning("Please select any size");
-            return false;
-        }
-        color = document.forms["formName"]["product_color"].value;
-        if (color != "") {
-            // access
-        } else {
-            toastr.error("Please select any color");
-            return false;
-        }
-    }
-</script>
-<script>
-    $(document).ready(function() {
-        $(".rating label").click(function() {
-            $(".rating label").removeClass("active");
-            $(this).addClass("active");
-        });
-    });
-</script>
-<script>
-    $(document).ready(function() {
-        $(".thumb_slider").owlCarousel({
-            margin: 15,
-            items: 4,
-            loop: true,
-            dots: false,
-            nav: true,
-            autoplayTimeout: 6000,
-            autoplayHoverPause: true,
-        });
-    });
-</script>
-
-<script type="text/javascript">
-    $(".block__pic").imagezoomsl({
-        zoomrange: [3, 3]
     });
 </script>
 @endpush

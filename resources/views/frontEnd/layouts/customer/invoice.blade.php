@@ -1,286 +1,72 @@
 @extends('frontEnd.layouts.master')
-@section('title','Customer Invoice')
+
+@section('title', 'Invoice — #' . $order->invoice_id)
+
 @section('content')
+<div class="sf-page">
+    <div class="sf-container">
+        <div class="sf-account">
+            @include('frontEnd.layouts.customer.sidebar')
 
-@php
-    // ১. পেমেন্ট ইনফো নেওয়া (Latest payment)
-    $payment = \App\Models\Payment::where('order_id', $order->id)->orderBy('id','desc')->first();
+            <div class="sf-apanel" id="invoiceArea">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:22px">
+                    <div>
+                        <h3 style="margin-bottom:4px">Invoice #{{ $order->invoice_id }}</h3>
+                        <p class="sf-faint" style="font-size:12.5px">Placed on {{ optional($order->created_at)->format('d M Y, h:i A') }}</p>
+                    </div>
+                    <div style="text-align:right">
+                        <span class="sf-badge sf-badge--navy">{{ optional($order->status)->name ?? 'Processing' }}</span>
+                        <div style="font-size:12px;color:var(--c-faint);margin-top:6px">Payment: {{ optional($order->payment)->payment_method ?? 'COD' }}</div>
+                    </div>
+                </div>
 
-    // ২. স্ট্যাটাস লোয়ারকেস করা
-    $gateway_status = $payment ? strtolower(trim($payment->payment_status)) : ''; 
-    $payment_method = $payment ? strtolower(trim($payment->payment_method)) : strtolower(trim($order->payment_method ?? ''));
-    
-    $admin_status   = strtolower(trim($order->payment_status ?? ''));
-    $order_status   = strtolower(trim($order->status ?? ''));
-
-    // ৩. গ্র্যান্ড টোটাল
-    $grand_total = $order->amount;
-    $paid_amount = 0;
-
-    // ======================================================
-    // ⭐ ইনভয়েস ক্যালকুলেশন লজিক (Exact Logic from Account Page)
-    // ======================================================
-
-    // ১. পেমেন্ট রেকর্ড থেকে আসল টাকাটা বের করি
-    if ($payment && !in_array($gateway_status, ['failed', 'cancel', 'cancelled', 'rejected'])) {
-        $paid_amount = $payment->amount;
-    }
-
-    // ২. COD ফিক্স: COD হলে এবং অর্ডার কমপ্লিট না হলে টাকা ০ দেখাবে (ভুল এড়াতে)
-    $is_cod = in_array($payment_method, ['cod', 'cash', 'cash_on_delivery', 'hand cash']);
-    $is_order_completed = in_array($order_status, ['completed', 'delivered']) || in_array($admin_status, ['completed', 'delivered']);
-
-    if ($is_cod && !$is_order_completed) {
-        if ($paid_amount >= $grand_total) {
-            $paid_amount = 0; 
-        }
-    }
-
-    // ৩. ফোর্স ফুল পেইড (Admin Priority):
-    if ($is_order_completed) {
-        $paid_amount = $grand_total;
-    } 
-    elseif (($paid_amount == 0 || !$payment) && in_array($admin_status, ['paid', 'success', 'approved'])) {
-        $paid_amount = $grand_total;
-    }
-
-    // ৪. ডিউ ক্যালকুলেশন
-    $due_amount = max(0, $grand_total - $paid_amount);
-
-    // ৫. স্ট্যাটাস চেক (ডিসপ্লে এর জন্য)
-    $is_failed = false;
-    if ($paid_amount == 0 && in_array($gateway_status, ['failed', 'cancel', 'cancelled'])) {
-        $is_failed = true;
-    }
-@endphp
-
-<style>
-    .customer-invoice { margin: 25px 0; }
-    .invoice_btn{ margin-bottom: 15px; }
-    td{ font-size: 16px; }
-
-   @page { size: a4;  margin: 0mm; background:#F9F9F9 }
-   @media print {
-        td{ font-size: 18px; }
-        header,footer,.no-print { display: none !important; }
-   }
-</style>
-
-<section class="customer-invoice">
-    <div class="container">
-        <div class="row">
-
-            <div class="col-sm-6">
-                <a href="{{route('customer.orders')}}">
-                    <strong><i class="fa-solid fa-arrow-left"></i> Back To Order</strong>
-                </a>
-            </div>
-
-            <div class="col-sm-6 text-end">
-                <button onclick="printFunction()" class="no-print invoice_btn btn btn-primary">
-                    <i class="fa fa-print"></i> Print
-                </button>
-            </div>
-
-            <div class="col-sm-12">
-
-                <div class="invoice-innter" style="width: 900px;margin: 0 auto;background: #f9f9f9;overflow: hidden;padding: 30px;padding-top: 0;">
-
-                    {{-- ===================== INVOICE HEADER ===================== --}}
-                    <table style="width:100%">
-                        <tr>
-                            <td style="width: 40%; float: left; padding-top: 15px;">
-
-                                <img src="{{asset($generalsetting->white_logo)}}" style="margin-top:25px !important;width:150px">
-
-                                <div style="margin: 20px 0;">
-                                    <p style="font-size: 14px; color: #222; margin-bottom: 5px;">
-                                        <strong>Payment Method:</strong> 
-                                        <span style="text-transform: uppercase;">{{ $payment_method }}</span>
-                                    </p>
-                                    
-                                    {{-- পেমেন্ট স্ট্যাটাস ডিসপ্লে --}}
-                                    <p style="font-size: 14px; color: #222;">
-                                        <strong>Status:</strong>
-                                        @if($paid_amount >= $grand_total)
-                                            <span style="color: green; font-weight: bold; text-transform: uppercase;">PAID</span>
-                                        @elseif($is_failed)
-                                            <span style="color: red; font-weight: bold; text-transform: uppercase;">FAILED</span>
-                                        @elseif($paid_amount > 0)
-                                            <span style="color: #007bff; font-weight: bold; text-transform: uppercase;">PARTIAL PAID</span>
-                                        @else
-                                            <span style="color: red; font-weight: bold; text-transform: uppercase;">UNPAID</span>
-                                        @endif
-                                    </p>
-                                </div>
-
-                                <div class="invoice_form">
-                                    <p><strong>Invoice From:</strong></p>
-                                    <p>{{$generalsetting->name}}</p>
-                                    <p>{{$contact->phone}}</p>
-                                    <p>{{$contact->email}}</p>
-                                    <p>{{$contact->address}}</p>
-                                    
-                                    @if(!empty($order->order_note) || !empty($order->note))
-                                        <p style="font-size:16px; line-height:1.8; color:#222; margin-top: 10px;">
-                                            <strong>Order Note:</strong> {{ $order->order_note ?? $order->note }}
-                                        </p>
-                                    @endif
-                                </div>
-                            </td>
-
-                            <td style="width:60%;float: left;">
-                                <div class="invoice-bar" style="background:#00aef0; transform: skew(38deg); padding: 20px 60px; margin-left: 65px;">
-                                    <p style="font-size: 30px; color: #fff; transform: skew(-38deg); text-align: right; font-weight: bold;">Invoice</p>
-                                </div>
-
-                                <div class="invoice-bar" style="background:#fff; transform: skew(36deg); width: 80%; margin-left: 182px; padding: 12px 32px; margin-top: 6px;text-align:right">
-                                   <p style="transform: skew(-36deg);display:inline-block">Invoice Date: <strong>{{$order->created_at->format('d-m-y')}}</strong></p>
-                                   <br>
-                                   <p style="transform: skew(-36deg);display:inline-block">Invoice No: <strong>{{$order->invoice_id}}</strong></p>
-                                </div>
-
-                                <div class="invoice_to" style="padding-top: 20px;">
-                                    <p><strong>Invoice To:</strong></p>
-                                    <p>{{$order->shipping?$order->shipping->name:''}}</p>
-                                    <p>{{$order->shipping?$order->shipping->phone:''}}</p>
-                                    <p>{{$order->shipping?$order->shipping->address:''}}</p>
-                                    <p>{{$order->shipping?$order->shipping->area:''}}</p>
-                                </div>
-                            </td>
-                        </tr>
-                    </table>
-
-                    {{-- ===================== PRODUCTS TABLE ===================== --}}
-                    <table class="table" style="margin-top: 30px;">
-                        <thead style="background: #00aef0; color: #fff;">
-                            <tr>
-                                <th>SL</th>
-                                <th>Product</th>
-                                <th>Price</th>
-                                <th>Qty</th>
-                                <th>Total</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            @foreach($order->orderdetails as $value)
-                            <tr>
-                                <td>{{$loop->iteration}}</td>
-                                <td>
-                                    {{$value->product_name}} <br>
-                                    @php
-                                        $sizeDisplay = null;
-                                        $colorDisplay = null;
-                                        if ($value->size) {
-                                            $sizeDisplay = $value->size->sizeName ?? $value->size->size_name ?? $value->size->name ?? null;
-                                        } elseif ($value->product_size) {
-                                            $s = \App\Models\Size::find($value->product_size);
-                                            $sizeDisplay = $s ? ($s->sizeName ?? $s->size_name ?? null) : null;
-                                        }
-                                        if ($value->color) {
-                                            $colorDisplay = $value->color->getDisplayName() ?? $value->color->colorName ?? $value->color->color_name ?? $value->color->name ?? null;
-                                        } elseif ($value->product_color) {
-                                            $c = \App\Models\Color::find($value->product_color);
-                                            $colorDisplay = $c ? ($c->getDisplayName() ?? $c->colorName ?? $c->color_name ?? null) : null;
-                                        }
-                                    @endphp
-                                    @if($sizeDisplay) <small>Size: {{ $sizeDisplay }}</small> @endif
-                                    @if($colorDisplay) <small>Color: {{ $colorDisplay }}</small> @endif
-                                </td>
-                                <td>৳{{$value->sale_price}}</td>
-                                <td>{{$value->qty}}</td>
-                                <td>৳{{$value->sale_price * $value->qty}}</td>
-                            </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-
-                    {{-- ===================== TOTAL CALCULATION ===================== --}}
-                    @php
-                        $subtotal = ($order->amount + $order->discount) - $order->shipping_charge;
-                        $shipping = $order->shipping_charge;
-                        $discount = $order->discount;
-                    @endphp
-
-                    <div class="invoice-bottom">
-                        <table class="table" style="width: 300px; float: right; margin-bottom: 30px;">
-                            <tbody style="background:#00aef0; color:#fff;">
-
-                                <tr>
-                                    <td><strong>SubTotal</strong></td>
-                                    <td><strong>৳{{$subtotal}}</strong></td>
-                                </tr>
-
-                                <tr>
-                                    <td><strong>Shipping(+)</strong></td>
-                                    <td><strong>৳{{$shipping}}</strong></td>
-                                </tr>
-
-                                <tr>
-                                    <td><strong>Discount(-)</strong></td>
-                                    <td><strong>৳{{$discount}}</strong></td>
-                                </tr>
-
-                                <tr>
-                                    <td><strong>Total Amount</strong></td>
-                                    <td><strong>৳{{$grand_total}}</strong></td>
-                                </tr>
-
-                                {{-- ========== Paid & Due Display ========== --}}
-                                @if($paid_amount > 0 && $due_amount > 0)
-                                    {{-- পার্শিয়াল পেমেন্ট (Advance) --}}
-                                    <tr style="background:#27ae60;">
-                                        <td><strong>Paid / Advance</strong></td>
-                                        <td><strong>৳{{ number_format($paid_amount, 2) }}</strong></td>
-                                    </tr>
-                                    <tr style="background:#c0392b;">
-                                        <td><strong>Due Amount</strong></td>
-                                        <td><strong>৳{{ number_format($due_amount, 2) }}</strong></td>
-                                    </tr>
-                                @elseif($paid_amount >= $grand_total)
-                                    {{-- ফুল পেইড --}}
-                                    <tr style="background:#27ae60;">
-                                        <td><strong>Paid Amount</strong></td>
-                                        <td><strong>৳{{ number_format($paid_amount, 2) }}</strong></td>
-                                    </tr>
-                                    <tr style="background:#2ecc71;">
-                                        <td><strong>Due Amount</strong></td>
-                                        <td><strong>৳0.00</strong></td>
-                                    </tr>
-                                @else
-                                    {{-- আনপেইড --}}
-                                    <tr style="background:#e74c3c;">
-                                        <td><strong>Paid Amount</strong></td>
-                                        <td><strong>৳0.00</strong></td>
-                                    </tr>
-                                    <tr style="background:#c0392b;">
-                                        <td><strong>Due Amount</strong></td>
-                                        <td><strong>৳{{ number_format($grand_total, 2) }}</strong></td>
-                                    </tr>
-                                @endif
-
-                            </tbody>
-                        </table>
-
-                        <div class="terms-condition" style="overflow: hidden; width: 100%; text-align: center; padding: 20px 0;">
-                            <h5 style="font-style: italic;">
-                                <a href="{{route('page',['slug'=>'terms-condition'])}}">Terms & Conditions</a>
-                            </h5>
-                            <p style="text-align: center; font-style: italic; font-size: 15px;">* This is a computer generated invoice.</p>
+                @if(!empty($order->shipping))
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:22px">
+                        <div style="background:var(--c-bg);border-radius:var(--r-md);padding:14px 16px">
+                            <div style="font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--c-faint);margin-bottom:6px">Deliver To</div>
+                            <b style="font-size:14px">{{ $order->shipping->name }}</b>
+                            <div style="font-size:12.5px;color:var(--c-muted);margin-top:4px">{{ $order->shipping->phone }}</div>
+                            <div style="font-size:12.5px;color:var(--c-muted)">{{ $order->shipping->address }}</div>
+                        </div>
+                        <div style="background:var(--c-bg);border-radius:var(--r-md);padding:14px 16px">
+                            <div style="font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--c-faint);margin-bottom:6px">Summary</div>
+                            <div class="sf-summary__row" style="font-size:12.5px"><span>Subtotal</span><span>৳{{ number_format((float) (($order->amount + $order->discount) - $order->shipping_charge)) }}</span></div>
+                            <div class="sf-summary__row" style="font-size:12.5px"><span>Shipping</span><span>৳{{ number_format((float) $order->shipping_charge) }}</span></div>
+                            <div class="sf-summary__row total" style="font-size:13.5px"><span>Total</span><span class="sf-price"><span class="cur">৳</span>{{ number_format((float) $order->amount) }}</span></div>
                         </div>
                     </div>
+                @endif
 
-                </div> 
+                <table style="width:100%;border-collapse:collapse;font-size:13px">
+                    <thead>
+                        <tr style="background:#f8f9fc;color:var(--c-faint);text-transform:uppercase;font-size:10.5px;letter-spacing:.6px">
+                            <th style="padding:10px 12px;text-align:left">Product</th>
+                            <th style="padding:10px 12px;text-align:center">Qty</th>
+                            <th style="padding:10px 12px;text-align:right">Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($order->orderdetails as $detail)
+                            <tr style="border-top:1px solid var(--c-line)">
+                                <td style="padding:11px 12px">
+                                    <div style="display:flex;align-items:center;gap:10px">
+                                        <img src="{{ asset(optional($detail->product->image)->image ?? optional($detail->image)->image ?? 'public/logo.png') }}" alt="" style="width:42px;height:42px;border-radius:9px;object-fit:cover;border:1px solid var(--c-line)" />
+                                        <span style="font-weight:700">{{ $detail->product_name ?? optional($detail->product)->name }}</span>
+                                    </div>
+                                </td>
+                                <td style="padding:11px 12px;text-align:center;font-weight:700">{{ $detail->qty }}</td>
+                                <td style="padding:11px 12px;text-align:right;font-weight:800">৳{{ number_format((float) ($detail->total_price ?? ($detail->price * $detail->qty))) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+
+                <div style="display:flex;gap:10px;margin-top:22px;flex-wrap:wrap">
+                    <button type="button" class="sf-btn sf-btn--dark sf-btn--sm" onclick="window.print()"><i class="fa-solid fa-print"></i> Print Invoice</button>
+                    <a class="sf-btn sf-btn--outline sf-btn--sm" href="{{ route('customer.orders') }}">Back to Orders</a>
+                </div>
             </div>
         </div>
     </div>
-</section>
-
-<script>
-    function printFunction() {
-        window.print();
-    }
-</script>
-
+</div>
 @endsection

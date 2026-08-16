@@ -1,41 +1,19 @@
 @extends('frontEnd.layouts.master')
-@section('title','Page')
-@section('content')
 
-<section class="comn_sec">
-    <div class="container">
-        <div class="row">
-            <div class="col-sm-12">
-                <div class="cmn_menu">
-                    <ul>
-                        @foreach($cmnmenu as $key=>$value)
-                        <li>
-                            <a href="{{route('page',$value->slug)}}">{{$value->name}}</a>
-                        </li>
-                        @endforeach
-                        <li>
-                            <a href="{{route('contact')}}">Contact Us</a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
+@section('title', $page->name)
+
+@section('content')
+<div class="sf-page">
+    <div class="sf-container">
+        <nav class="sf-breadcrumb" aria-label="Breadcrumb">
+            <a href="{{ route('home') }}">Home</a><i class="fa-solid fa-angle-right"></i>
+            <span class="cur">{{ $page->name }}</span>
+        </nav>
+
+        <div class="sf-cms">
+            <h1 style="font-size:24px;margin-bottom:16px">{{ $page->name }}</h1>
+            <div class="sf-prose">{!! $page->details ?? '' !!}</div>
         </div>
     </div>
-</section>
-<section class="createpage-section">
-    <div class="container">
-        <div class="row">
-            <div class="col-sm-12">
-                <div class="page-content">
-                    <div class="page-title mb-2">
-                        <h5>{{$page->title}}</h5>
-                    </div>
-                    <div class="page-description">
-                        {!! $page->description !!}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
+</div>
 @endsection
