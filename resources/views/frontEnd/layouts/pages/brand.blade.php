@@ -1,189 +1,51 @@
 @extends('frontEnd.layouts.master')
-@section('title', $brand->name)
 
-@push('css')
-<link rel="stylesheet" href="{{ asset('public/frontEnd/css/jquery-ui.css') }}">
-@endpush
+@section('title', $brand->name . ' — Products')
 
 @section('content')
-<section class="product-section">
-    <div class="container">
+<div class="sf-page">
+    <div class="sf-container">
 
-        {{-- 🔹 Breadcrumb + Sorting --}}
-        <div class="sorting-section">
-            <div class="row">
-                <div class="col-sm-6">
-                    <div class="category-breadcrumb d-flex align-items-center">
-                        <a href="{{ route('home') }}">Home</a>
-                        <span>/</span>
-                        <strong>{{ $brand->name }}</strong>
-                    </div>
-                </div>
+        <nav class="sf-breadcrumb" aria-label="Breadcrumb">
+            <a href="{{ route('home') }}">Home</a><i class="fa-solid fa-angle-right"></i>
+            <a href="{{ route('shop') }}">Shop</a><i class="fa-solid fa-angle-right"></i>
+            <span class="cur">{{ $brand->name }}</span>
+        </nav>
 
-                <div class="col-sm-6">
-                    <div class="row">
-                        <div class="col-sm-6">
-                            <div class="showing-data">
-                                <span>
-                                    Showing {{ $products->firstItem() }}-{{ $products->lastItem() }}
-                                    of {{ $products->total() }} Results
-                                </span>
-                            </div>
-                        </div>
-
-                        <div class="col-sm-6">
-                            <div class="page-sort">
-                                <form class="sort-form">
-                                    <select name="sort" class="form-control form-select sort">
-                                        <option value="1" @selected(request('sort')==1)>Product: Latest</option>
-                                        <option value="2" @selected(request('sort')==2)>Product: Oldest</option>
-                                        <option value="3" @selected(request('sort')==3)>Price: High To Low</option>
-                                        <option value="4" @selected(request('sort')==4)>Price: Low To High</option>
-                                        <option value="5" @selected(request('sort')==5)>Name: A-Z</option>
-                                        <option value="6" @selected(request('sort')==6)>Name: Z-A</option>
-                                    </select>
-
-                                    <input type="hidden" name="min_price" value="{{ request('min_price') }}">
-                                    <input type="hidden" name="max_price" value="{{ request('max_price') }}">
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+        <div style="display:flex;align-items:center;gap:18px;background:#fff;border:1px solid var(--c-line);border-radius:var(--r-lg);padding:20px;margin-bottom:20px">
+            <img src="{{ asset($brand->image) }}" alt="{{ $brand->name }}" style="width:84px;height:84px;border-radius:16px;object-fit:contain;border:1px solid var(--c-line);padding:8px;background:#fff" />
+            <div>
+                <h1 style="font-size:22px">{{ $brand->name }}</h1>
+                <p class="sf-faint" style="font-size:13px;margin-top:4px">{{ $products->total() }} product(s) from this brand</p>
             </div>
         </div>
 
-        {{-- 🔹 Product Grid --}}
-        <div class="row">
-            <div class="col-sm-12">
-                <div class="category-product main_product_inner">
+        <form method="GET" class="sf-shop__toolbar" style="margin-bottom:16px">
+            <h3>All {{ $brand->name }} Products</h3>
+            <label class="sf-shop__sort">Sort by
+                <select class="sf-select" name="sort" onchange="this.form.submit()">
+                    <option value="">Newest</option>
+                    <option value="3" @if(request('sort') == 3) selected @endif>Price: High → Low</option>
+                    <option value="4" @if(request('sort') == 4) selected @endif>Price: Low → High</option>
+                </select>
+            </label>
+        </form>
 
-                    @foreach($products as $key => $value)
-                    <div class="product_item wist_item wow zoomIn"
-                         data-wow-duration="1.5s"
-                         data-wow-delay="0.{{ $key }}s">
-
-                        <div class="product_item_inner">
-
-                            {{-- Discount badge --}}
-                            @if($value->old_price)
-                            <div class="sale-badge">
-                                <div class="sale-badge-inner">
-                                    <div class="sale-badge-box">
-                                        <span class="sale-badge-text">
-                                            @php
-                                                $discount = (($value->old_price - $value->new_price) * 100) / $value->old_price;
-                                            @endphp
-                                            <p>{{ number_format($discount,0) }}%</p>
-                                            ছাড়
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                            @endif
-
-                            {{-- Product image --}}
-                            <div class="pro_img">
-                                <a href="{{ route('product', $value->slug) }}">
-                                    <img src="{{ asset($value->image ? $value->image->image : '') }}"
-                                         alt="{{ $value->name }}">
-                                </a>
-                            </div>
-
-                            {{-- Product name --}}
-                            <div class="pro_des">
-                                <div class="pro_name">
-                                    <a href="{{ route('product', $value->slug) }}">
-                                        {{ Str::limit($value->name, 35) }}
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-
-                        {{-- Rating --}}
-                        @php
-                            $avg = $value->reviews->avg('ratting') ?? 0;
-                            $full = floor($avg);
-                        @endphp
-                        @for($i=1; $i<=5; $i++)
-                            <i class="{{ $i <= $full ? 'fas' : 'far' }} fa-star"></i>
-                        @endfor
-
-                        {{-- Price --}}
-                        <div class="pro_price">
-                            @if($value->old_price)
-                                <del>৳ {{ $value->old_price }}</del>
-                            @endif
-                            ৳ {{ $value->new_price }}
-                        </div>
-
-                        {{-- 🔥 TWO BUTTONS --}}
-                        <div class="pro_btn">
-
-                            @if(!$value->prosizes->isEmpty() || !$value->procolors->isEmpty())
-                                {{-- Variant product → details page --}}
-                                <a href="{{ route('product', $value->slug) }}"
-                                   data-id="{{ $value->id }}"
-                                   class="order-btn-link qo-order-link">
-                                    অর্ডার করুন
-                                </a>
-
-                                <a href="{{ route('product', $value->slug) }}"
-                                   data-id="{{ $value->id }}"
-                                   class="cart-icon-link qo-cart-link">
-                                    <i class="fa-solid fa-cart-shopping"></i>
-                                </a>
-                            @else
-                                {{-- Simple product --}}
-                                {{-- Order Now --}}
-                                <form action="{{ route('cart.store') }}" method="POST">
-                                    @csrf
-                                    <input type="hidden" name="id" value="{{ $value->id }}">
-                                    <input type="hidden" name="qty" value="1">
-                                    <input type="hidden" name="order_now" value="1">
-
-                                    <button type="submit" class="order-btn">
-                                        অর্ডার করুন
-                                    </button>
-                                </form>
-
-                                {{-- Add to Cart --}}
-                                <form action="{{ route('cart.store') }}" method="POST">
-                                    @csrf
-                                    <input type="hidden" name="id" value="{{ $value->id }}">
-                                    <input type="hidden" name="qty" value="1">
-
-                                    <button type="submit" class="cart-icon-btn cart_store" data-id="{{ $value->id }}">
-                                        <i class="fa-solid fa-cart-shopping"></i>
-                                    </button>
-                                </form>
-                            @endif
-
-                        </div>
-                    </div>
-                    @endforeach
-
-                </div>
+        @if($products->count())
+            <div class="sf-pgrid sf-pgrid--5">
+                @foreach($products as $product)
+                    @include('frontEnd.layouts.partials.product-card', ['product' => $product])
+                @endforeach
             </div>
-        </div>
-
-        {{-- 🔹 Pagination --}}
-        <div class="row">
-            <div class="col-sm-12">
-                <div class="custom_paginate">
-                    {{ $products->links('pagination::bootstrap-4') }}
-                </div>
+            {{ $products->onEachSide(1)->links('pagination::bootstrap-5') }}
+        @else
+            <div class="sf-empty sf-card-surface">
+                <i class="fa-regular fa-face-frown"></i>
+                <h4>No products found</h4>
+                <p>This brand has no products right now.</p>
+                <a class="sf-btn sf-btn--dark" style="margin-top:16px" href="{{ route('shop') }}">Browse All Products</a>
             </div>
-        </div>
-
+        @endif
     </div>
-</section>
+</div>
 @endsection
-
-@push('script')
-<script>
-    $('.sort').change(function () {
-        $('.sort-form').submit();
-    });
-</script>
-@endpush

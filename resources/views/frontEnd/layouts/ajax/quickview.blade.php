@@ -1,72 +1,47 @@
-<div class="modal-view quick-product">
-	<button class="close-modal">x</button>
-	<div class="quick-product-img">
-		<img src="{{asset($data->image->image)}}" alt="">
-	</div>
-	<div class="quick-product-content">
-		<div class="product-details-cart">
-            <p class="name">{{$data->name}}</p>
-             <p style="display: none;" class="product_star"><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i> ({{$data->reviews_count}} customer review)</p>
-            <p class="details-price">৳{{$data->new_price}} @if($data->old_price)<del>৳{{$data->old_price}}</del>@endif</p>
-            <div class="details_short">
-                {!! $data->short_description !!}
-            </div>
-            <form action="{{route('cart.store')}}" method="POST">
-                @csrf
-                <input type="hidden" name="id" value="{{$data->id}}">                
-                
-                <div class="qty-cart">
-                    <div class="quantity">
-                        <span class="minus">-</span>
-                        <input type="text" name="qty" value="1"/>
-                        <span class="plus">+</span>
-                    </div>
-                    <button type="submit" class="add-to-cart cart_store" data-id="{{$data->id}}">add to cart</button>
-                </div>
-            </form>
-            <a href="{{route('product',['id'=>$data->id])}}" style="display: none;" class="details-wishlist">Go To Details</a>
-            <div class="col-12 mt-3 delivery_details">
-                <table class="table">
-                    <tbody>                                    
-                        <tr>
-                            <td class="potro_font">
-                               Category: {{ $data->category->name }}
-                            </td>                                        
-                        </tr>
-                        <tr>
-                            <td class="potro_font">
-                               Brand: {{ $data->brand ? $data->brand->name : '' }}
-                            </td>                                        
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+@php
+    $img = isset($data->image) && $data->image ? $data->image->image : 'public/logo.png';
+    $rating = (int) round(optional($data->reviews)->avg('ratting') ?? 0);
+@endphp
+<div class="sf-modal" style="border-radius:20px;max-width:720px">
+    <div class="sf-modal__head">
+        <img src="{{ asset($img) }}" alt="{{ $data->name }}" />
+        <b>{{ $data->name }}</b>
+        <button class="close" type="button" onclick="$('#custom-modal').hide();$('#page-overlay').hide().removeClass('show')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="sf-modal__body">
+        <div class="sf-pd__pricebar" style="margin-bottom:14px">
+            <span class="sf-price"><span class="cur">৳</span>{{ number_format((float) $data->new_price) }}</span>
+            @if(!empty($data->old_price) && $data->old_price > $data->new_price)
+                <span class="sf-old-price">৳{{ number_format((float) $data->old_price) }}</span>
+                <span class="sf-badge sf-badge--accent">-{{ round((($data->old_price - $data->new_price) * 100) / $data->old_price) }}%</span>
+            @endif
         </div>
-	</div>
+        <div class="sf-stars" style="font-size:13px;margin-bottom:12px">
+            @for($i = 1; $i <= 5; $i++)<i class="fa-solid fa-star {{ $i <= $rating ? 'on' : '' }}"></i>@endfor
+            <span class="sf-faint" style="margin-left:6px">({{ optional($data->reviews)->count() ?? 0 }} reviews)</span>
+        </div>
+        @if(!empty($data->short_description))
+            <div class="sf-prose" style="max-height:110px;overflow:auto">{!! $data->short_description !!}</div>
+        @endif
+        <form action="{{ route('cart.store') }}" method="POST">
+            @csrf
+            <input type="hidden" name="id" value="{{ $data->id }}">
+            <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:16px">
+                <div class="sf-qty">
+                    <button type="button" data-qty="minus">−</button>
+                    <input type="text" name="qty" value="1" />
+                    <button type="button" data-qty="plus">+</button>
+                </div>
+                <button type="submit" class="sf-btn sf-btn--primary sf-btn--lg cart_store" data-id="{{ $data->id }}" style="flex:1;min-width:180px">
+                    <i class="fa-solid fa-cart-plus"></i> Add to Cart
+                </button>
+            </div>
+        </form>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;font-size:12.5px;font-weight:700;color:var(--c-muted)">
+            <span><i class="fa-solid fa-shield-halved" style="color:var(--c-green);margin-right:5px"></i> 100% Secure Payment</span>
+            <span><i class="fa-solid fa-truck-fast" style="color:var(--c-green);margin-right:5px"></i> Fast Delivery</span>
+            <span><i class="fa-solid fa-rotate-left" style="color:var(--c-green);margin-right:5px"></i> Easy Return</span>
+        </div>
+        <a class="sf-btn sf-btn--outline sf-btn--block" style="margin-top:14px" href="{{ route('product', ['id' => $data->slug]) }}">View Full Details <i class="fa-solid fa-arrow-right"></i></a>
+    </div>
 </div>
-<script src="{{asset('public/frontEnd/js/jquery-3.6.3.min.js')}}"></script>
-<script>
-	$('.close-modal').on('click',function(){
-        $("#custom-modal").hide();
-        $("#page-overlay").hide();
-     });
-</script>
-<script>
-    $(document).ready(function() {
-        $('.minus').click(function () {
-            var $input = $(this).parent().find('input');
-            var count = parseInt($input.val()) - 1;
-            count = count < 1 ? 1 : count;
-            $input.val(count);
-            $input.change();
-            return false;
-        });
-        $('.plus').click(function () {
-            var $input = $(this).parent().find('input');
-            $input.val(parseInt($input.val()) + 1);
-            $input.change();
-            return false;
-        });
-    });
-</script>
-<!-- cart js start -->

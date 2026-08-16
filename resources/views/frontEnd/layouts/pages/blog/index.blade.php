@@ -1,133 +1,40 @@
 @extends('frontEnd.layouts.master')
-@section('title','Blog')
 
-@push('css')
-<style>
-.blog-card {
-    border: 1px solid #eee;
-    border-radius: 10px;
-    overflow: hidden;
-    transition: all .3s ease;
-    background: #fff;
-    height: 100%;
-}
-
-.blog-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 25px rgba(0,0,0,.08);
-}
-
-.blog-img img {
-    width: 100%;
-    height: 220px;
-    object-fit: cover;
-}
-
-.blog-content {
-    padding: 15px;
-}
-
-.blog-title a {
-    font-size: 18px;
-    font-weight: 600;
-    color: #222;
-    text-decoration: none;
-}
-
-.blog-title a:hover {
-    color: #0d6efd;
-}
-
-.blog-meta {
-    font-size: 13px;
-    color: #777;
-    margin-bottom: 10px;
-}
-
-.read-more-btn {
-    border-radius: 20px;
-    padding: 6px 22px;
-    font-size: 14px;
-}
-</style>
-@endpush
+@section('title', 'Blog')
 
 @section('content')
-<section class="blog-section product-section">
-    <div class="container">
-
-        {{-- Breadcrumb --}}
-        <div class="sorting-section mb-4">
-            <div class="row">
-                <div class="col-sm-12">
-                    <div class="category-breadcrumb d-flex align-items-center">
-                        <a href="{{ route('home') }}">Home</a>
-                        <span>/</span>
-                        <strong>Blog</strong>
-                    </div>
-                </div>
+<div class="sf-page">
+    <div class="sf-container">
+        <div class="sf-page-head" style="border-radius:var(--r-lg);margin-top:18px">
+            <div class="sf-container">
+                <h1><i class="fa-solid fa-newspaper" style="color:#ffb02e;margin-right:10px"></i>Our Blog</h1>
+                <p style="color:#c3cdea;font-size:14px;margin-top:6px">Tips, guides and shopping inspiration from our team.</p>
             </div>
         </div>
 
-        {{-- Blog Grid --}}
-        <div class="row">
-            @foreach($blogs as $blog)
-            <div class="col-md-4 mb-4 d-flex">
-
-                <div class="blog-card w-100">
-
-                    {{-- Image --}}
-                    <div class="blog-img">
-                        <a href="{{ route('blog.details',$blog->slug) }}">
-                            @if($blog->image)
-                                <img src="{{ url('public/'.$blog->image) }}" alt="{{ $blog->title }}">
-                            @else
-                                <img src="{{ url('public/no-image.png') }}" alt="No Image">
-                            @endif
-                        </a>
-                    </div>
-
-                    {{-- Content --}}
-                    <div class="blog-content">
-
-                        <div class="blog-title mb-1">
-                            <a href="{{ route('blog.details',$blog->slug) }}">
-                                {{ Str::limit($blog->title,50) }}
-                            </a>
+        @if($blogs->count())
+            <div class="sf-blogs" style="margin-top:22px">
+                @foreach($blogs as $blog)
+                    <article class="sf-blog">
+                        <a href="{{ route('blog.details', $blog->slug) }}"><img src="{{ asset($blog->image) }}" alt="{{ $blog->title }}" loading="lazy" /></a>
+                        <div class="sf-blog__body">
+                            <h4><a href="{{ route('blog.details', $blog->slug) }}">{{ $blog->title }}</a></h4>
+                            <p class="sf-clamp-2">{{ Str::limit(strip_tags($blog->description ?? ''), 130) }}</p>
+                            <div class="sf-blog__meta">
+                                <span><i class="fa-regular fa-calendar" style="margin-right:5px"></i>{{ optional($blog->created_at)->format('M d, Y') }}</span>
+                            </div>
                         </div>
-
-                        <div class="blog-meta">
-                            {{ $blog->created_at->format('d M Y') }} |
-                            👁 {{ $blog->views }}
-                        </div>
-
-                        <p>
-                            {{ Str::limit($blog->short_description,120) }}
-                        </p>
-
-                        <div class="text-center mt-3">
-                            <a href="{{ route('blog.details', $blog->slug) }}"
-                               class="btn btn-sm btn-outline-primary read-more-btn">
-                                Read More
-                            </a>
-                        </div>
-
-                    </div>
-                </div>
-
+                    </article>
+                @endforeach
             </div>
-            @endforeach
-        </div>
-
-        {{-- Pagination --}}
-        <div class="row">
-            <div class="col-sm-12">
-                <div class="custom_paginate text-center">
-                    {{ $blogs->links('pagination::bootstrap-4') }}
-                </div>
+            {{ $blogs->onEachSide(1)->links('pagination::bootstrap-5') }}
+        @else
+            <div class="sf-empty sf-card-surface">
+                <i class="fa-solid fa-newspaper"></i>
+                <h4>No articles yet</h4>
+                <p>Fresh content is on the way.</p>
             </div>
-        </div>
-
+        @endif
     </div>
-</section>
+</div>
 @endsection

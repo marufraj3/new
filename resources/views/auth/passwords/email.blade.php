@@ -1,46 +1,23 @@
 @extends('layouts.app')
-
+@section('title', 'Reset Password')
 @section('content')
-<div class="container">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header">{{ __('Reset Password') }}</div>
-
-                <div class="card-body">
-                    @if (session('status'))
-                        <div class="alert alert-success" role="alert">
-                            {{ session('status') }}
-                        </div>
-                    @endif
-
-                    <form method="POST" action="{{ route('password.email') }}">
-                        @csrf
-
-                        <div class="row mb-3">
-                            <label for="email" class="col-md-4 col-form-label text-md-end">{{ __('Email Address') }}</label>
-
-                            <div class="col-md-6">
-                                <input id="email" type="email" class="form-control @error('email') is-invalid @enderror" name="email" value="{{ old('email') }}" required autocomplete="email" autofocus>
-
-                                @error('email')
-                                    <span class="invalid-feedback" role="alert">
-                                        <strong>{{ $message }}</strong>
-                                    </span>
-                                @enderror
-                            </div>
-                        </div>
-
-                        <div class="row mb-0">
-                            <div class="col-md-6 offset-md-4">
-                                <button type="submit" class="btn btn-primary">
-                                    {{ __('Send Password Reset Link') }}
-                                </button>
-                            </div>
-                        </div>
-                    </form>
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <div class="sf-card-surface" style="padding:30px">
+            <h2 class="fw-bold text-center mb-1">Reset Password</h2>
+            <p class="text-center sf-faint mb-4" style="font-size:13.5px">Enter your email and we'll send a reset link.</p>
+            @if (session('status'))
+                <div class="sf-form-msg sf-form-msg--success">{{ session('status') }}</div>
+            @endif
+            <form method="POST" action="{{ route('password.email') }}">
+                @csrf
+                <div class="sf-field">
+                    <label>Email Address <span class="req">*</span></label>
+                    <input id="email" type="email" class="sf-input" name="email" value="{{ old('email') }}" required autofocus />
                 </div>
-            </div>
+                @if($errors->any())<div class="sf-form-msg sf-form-msg--error">{{ $errors->first('email') }}</div>@endif
+                <button type="submit" class="sf-btn sf-btn--primary sf-btn--lg sf-btn--block">Send Reset Link</button>
+            </form>
         </div>
     </div>
 </div>

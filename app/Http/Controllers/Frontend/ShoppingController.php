@@ -591,6 +591,30 @@ class ShoppingController extends Controller
     }
 
     /**
+     * Full cart page (route: cart.show)
+     */
+    public function cart_show(Request $request)
+    {
+        $data = Cart::instance('shopping')->content();
+
+        // Parity with checkout: digital-only carts and all-free-delivery
+        // carts ship free — clear any stale shipping charge.
+        $requiresShipping = false;
+        foreach ($data as $item) {
+            $product = \App\Models\Product::find($item->id);
+            if ($product && $product->is_digital != 1) {
+                $requiresShipping = true;
+                break;
+            }
+        }
+        if (!$requiresShipping || self::hasAllFreeDeliveryProducts()) {
+            Session::put('shipping', 0);
+        }
+
+        return view('frontEnd.layouts.pages.cart', compact('data'));
+    }
+
+    /**
      * Campaign landing pages need a script-free cart table that keeps
      * the same columns as the checkout UI. The main store cart partial
      * injects jQuery handlers and a delete column, which breaks those pages.
