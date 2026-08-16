@@ -48,14 +48,6 @@
         </div>
     </div>
 
-    {{-- ================= FEATURES ================= --}}
-    <div class="sf-features">
-        <div class="sf-feature"><i class="fa-solid fa-truck-fast"></i><div><b>Fast Delivery</b><small>All over Bangladesh</small></div></div>
-        <div class="sf-feature"><i class="fa-solid fa-shield-halved"></i><div><b>Secure Payment</b><small>bKash · Nagad · COD</small></div></div>
-        <div class="sf-feature"><i class="fa-solid fa-rotate-left"></i><div><b>Easy Returns</b><small>7-day return policy</small></div></div>
-        <div class="sf-feature"><i class="fa-solid fa-headset"></i><div><b>24/7 Support</b><small>We're here to help</small></div></div>
-    </div>
-
     {{-- ================= CATEGORIES ================= --}}
     @if(($frontcategory ?? collect())->count())
         <div class="sf-sec-head">
@@ -75,6 +67,22 @@
                     <b>{{ $cat->name }}</b>
                     <small>{{ optional($cat->products)->count() ?? 0 }}+ items</small>
                 </a>
+            @endforeach
+        </div>
+    @endif
+
+    {{-- ================= REFERENCE PROMOTIONAL BANNERS ================= --}}
+    @php
+        $referencePromos = collect($homepageads ?? [])
+            ->merge(collect($homepageads2 ?? []))
+            ->merge(collect($campaognads ?? []))
+            ->merge(collect($sliderbottomads ?? []))
+            ->unique('image')->take(4);
+    @endphp
+    @if($referencePromos->count())
+        <div class="sf-reference-promos">
+            @foreach($referencePromos as $ad)
+                <a href="{{ $ad->link ?? '#' }}"><img src="{{ asset($ad->image) }}" alt="Promotional banner" loading="lazy"></a>
             @endforeach
         </div>
     @endif
