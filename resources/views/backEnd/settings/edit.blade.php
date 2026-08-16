@@ -305,9 +305,11 @@
                     </div>
                     <div class="p-4">
                         <p class="text-muted small mb-3">
-                            ফ্রন্টএন্ডে <strong>"অর্ডার করুন"</strong> বা <strong>কার্ট</strong> বাটনে ক্লিক করলে এই পপআপ
-                            দেখাবে — গ্রাহক সাইট ছেড়ে না গিয়েই সাইজ/কালার/পরিমাণ সিলেক্ট করে সরাসরি অর্ডার/কার্টে যোগ করতে পারবে।
-                            (হাই-কনভার্টিং, ফাস্ট, রেস্পন্সিভ)
+                            ফ্রন্টএন্ডে <strong>"Order Now"</strong> বা <strong>কার্ট</strong> বাটনে ক্লিক করলে এই পপআপ
+                            দেখাবে — গ্রাহক সাইট ছেড়ে না গিয়েই ২ ধাপে অর্ডার কমপ্লিট করতে পারবে:
+                            <strong>১. সাইজ/কালার/পরিমাণ</strong> → <strong>২. নাম/মোবাইল/ঠিকানা</strong> → কনফার্ম।
+                            অর্ডারটি existing order system-এ (Order / Shipping / Payment / OrderDetails + স্টক কমানো
+                            + SMS) normal checkout-এর মতোই তৈরি হয়। (হাই-কনভার্টিং, ফাস্ট, রেস্পন্সিভ)
                         </p>
                         <div class="row g-3">
                             <div class="col-md-4 mb-3">

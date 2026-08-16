@@ -90,6 +90,23 @@ class Runtime {
       strReplace: (a, b, c) => String(c === null || c === undefined ? '' : c).split(a).join(b),
       floatval: (x) => parseFloat(String(x).replace(/[^\d.]/g, '')) || 0,
       pregReplaceClean: (x) => parseFloat(String(x).replace(/[^\d.]/g, '')) || 0,
+      pregReplace: (pattern, replacement, subject) => {
+        let p = String(pattern || '');
+        let flags = 'g';
+        const m = p.match(/^\/(.*)\/([a-z]*)$/);
+        if (m) {
+          p = m[1];
+          const f = (m[2] || '').replace(/u/g, '');
+          flags = (f.indexOf('g') > -1 ? '' : 'g') + f;
+        } else {
+          p = p.replace(/^\/|\/$/g, '');
+        }
+        try {
+          return String(subject == null ? '' : subject).replace(new RegExp(p, flags), String(replacement == null ? '' : replacement));
+        } catch (e) {
+          return subject;
+        }
+      },
       collect: () => new Collection([]),
       optional: (x) => new Proxy(x === null || x === undefined ? {} : x, {
         get: (t, p) => {
@@ -322,14 +339,21 @@ class ExprParser {
       while (this.i < this.src.length && /[0-9.]/.test(this.src[this.i])) num += this.src[this.i++];
       return num;
     }
-    /* strings */
+    /* strings (PHP-style: unknown escapes preserved) */
     if (c === "'" || c === '"') {
       const q = c;
       this.i++;
       let s = '';
       while (this.i < this.src.length) {
         const ch = this.src[this.i];
-        if (ch === '\\') { s += this.src[this.i + 1]; this.i += 2; continue; }
+        if (ch === '\\') {
+          const nx = this.src[this.i + 1];
+          if (q === '"' && nx === 'n') { s += '\n'; this.i += 2; continue; }
+          if (q === '"' && nx === 't') { s += '\t'; this.i += 2; continue; }
+          if (q === '"' && nx === 'r') { s += '\r'; this.i += 2; continue; }
+          if (nx === '\\' || nx === q) { s += nx; this.i += 2; continue; }
+          s += ch; this.i++; continue;   // preserve unknown escape (e.g. \s, \d)
+        }
         if (ch === q) { this.i++; break; }
         s += ch; this.i++;
       }
@@ -511,7 +535,7 @@ class ExprParser {
     const map = {
       route: '_h.route', url: '_h.url', asset: '_h.asset', e: '_h.e', count: '_h.count', empty: '_h.empty',
       number_format: '_h.nfmt', optional: '_h.optional', json_encode: '_h.json', date: '_h.date',
-      strtotime: '_h.strtotime', floatval: '_h.floatval', preg_replace: '_h.pregReplaceClean', str_replace: '_h.strReplace',
+      strtotime: '_h.strtotime', floatval: '_h.floatval', preg_replace: '_h.pregReplace', str_replace: '_h.strReplace',
       strtoupper: 'String.prototype.toUpperCase.call', strtolower: 'String.prototype.toLowerCase.call', substr: 'String.prototype.substr.call',
       in_array: '_h.inArray', round: 'Math.round', floor: 'Math.floor', ceil: 'Math.ceil', max: 'Math.max', min: 'Math.min', abs: 'Math.abs',
       config: '_h.config', collect: '_h.collect', session: '_h.session', request: '_h.query', app: '_h.app', urlencode: '_h.urlencode',
@@ -522,6 +546,7 @@ class ExprParser {
     if (name === 'isset') return '((' + args + ' !== undefined && ' + args + ' !== null))';
     if (name === 'ucfirst') return '_h.ucfirst(' + args + ')';
     if (name === 'substr') return '(_h.strSub(' + args + '))';
+    if (name === 'strlen') return '(String(' + args + ').length)';
     if (name === 'strtoupper') return '(String(' + args + ').toUpperCase())';
     if (name === 'strtolower') return '(String(' + args + ').toLowerCase())';
     if (map[name]) {

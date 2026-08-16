@@ -8,7 +8,7 @@
     <title>@yield('title', config('app.name', 'Shop Genie'))</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ asset('public/frontEnd/css/all.min.css') }}" />
-    <link rel="stylesheet" href="{{ asset('public/frontEnd/css/storefront.css') }}?v=3" />
+    <link rel="stylesheet" href="{{ asset('public/frontEnd/css/storefront.css') }}?v=4" />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>

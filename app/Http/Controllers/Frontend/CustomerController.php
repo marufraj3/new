@@ -1092,96 +1092,24 @@ public function order_save(Request $request)
 
  // === Customer SMS ===
         try {
-            $sms_gateway = SmsGateway::where(['status' => 1, 'order' => 1])->first();
-            if(!$sms_gateway){
-                $sms_gateway = SmsGateway::where('status', 1)->first();
-            }
+            $customerPhone = isset($shipping) && $shipping->phone ? $shipping->phone : ($request->phone ?? ($order->customer->phone ?? null));
+            $customerName  = isset($shipping) && $shipping->name ? $shipping->name : ($request->name ?? ($order->customer->name ?? 'Customer'));
 
-            if($sms_gateway) {
-                $url = $sms_gateway->url;
-
-                $customerPhone = isset($shipping) && $shipping->phone ? $shipping->phone : ($request->phone ?? ($order->customer->phone ?? null));
-                $customerName  = isset($shipping) && $shipping->name ? $shipping->name : ($request->name ?? ($order->customer->name ?? 'Customer'));
-                $site_setting = GeneralSetting::where('status', 1)->first();
-
-                if($customerPhone) {
-                    $customerMessage = "প্রিয় {$customerName}! আপনার অর্ডার #{$order->invoice_id} সফলভাবে গ্রহণ করা হয়েছে। মোট: {$order->amount} Tk. {$site_setting->name}";
-
-                    $postData = [
-                        'api_key' => $sms_gateway->api_key,
-                        'number'  => preg_replace('/[^0-9+]/','', $customerPhone),
-                        'type'    => 'text',
-                        'senderid'=> $sms_gateway->serderid ?? $sms_gateway->senderid ?? '',
-                        'message' => $customerMessage,
-                    ];
-
-                    $ch = curl_init();
-                    curl_setopt($ch, CURLOPT_URL, $url);
-                    curl_setopt($ch, CURLOPT_POST, 1);
-                    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
-                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-                    $resp = curl_exec($ch);
-                    $err  = curl_error($ch);
-                    curl_close($ch);
-
-                    \Log::info("Customer SMS to {$customerPhone}: resp=" . substr($resp ?? '',0,200) . " err=" . $err);
-                } else {
-                    \Log::warning("Customer SMS skipped: no phone for order {$order->id}");
-                }
-            }
-        } catch(\Exception $e) {
+            app(\App\Services\OrderNotificationService::class)
+                ->orderSms($order, $customerPhone, $customerName);
+        } catch (\Exception $e) {
             \Log::error("Customer SMS error for order {$order->id}: " . $e->getMessage());
         }
 
         // === Admin SMS ===
         try {
-            $sms_gateway = SmsGateway::where('status', 1)->first();
-            if($sms_gateway) {
-                $url = $sms_gateway->url;
+            $customerName  = isset($request->name) ? $request->name : ($order->customer->name ?? 'Customer');
+            $customerPhone = isset($request->phone) ? $request->phone : ($order->customer->phone ?? '');
 
-                $adminPhones = env('ADMIN_PHONE_LIST', null);
-                if(!$adminPhones && isset($sms_gateway->admin_phone)){
-                    $adminPhones = $sms_gateway->admin_phone;
-                }
-                if(!$adminPhones){
-                    $contact = Contact::first();
-                    $adminPhones = $contact->phone ?? null;
-                }
-
-                $site_setting = GeneralSetting::where('status', 1)->first();
-                $customerName = isset($request->name) ? $request->name : ($order->customer->name ?? 'Customer');
-                $customerPhone = isset($request->phone) ? $request->phone : ($order->customer->phone ?? '');
-                $adminMessage = "নতুন অর্ডার এসেছে!\nOrder#: {$order->invoice_id}\nকাস্টমার: {$customerName}\nমোবাইল: {$customerPhone}\nমোট: {$order->amount} Tk {$site_setting->name}";
-
-                if($adminPhones){
-                    $numbers = array_filter(array_map('trim', explode(',', $adminPhones)));
-                    foreach($numbers as $adminPhone){
-                        $adminPhone = preg_replace('/[^0-9+]/', '', $adminPhone);
-                        $postData = [
-                            'api_key' => $sms_gateway->api_key,
-                            'number'  => $adminPhone,
-                            'type'    => 'text',
-                            'senderid'=> $sms_gateway->serderid ?? $sms_gateway->senderid ?? '',
-                            'message' => $adminMessage,
-                        ];
-
-                        $ch = curl_init();
-                        curl_setopt($ch, CURLOPT_URL, $url);
-                        curl_setopt($ch, CURLOPT_POST, 1);
-                        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
-                        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-                        $resp = curl_exec($ch);
-                        $err  = curl_error($ch);
-                        curl_close($ch);
-
-                        \Log::info("Admin SMS to {$adminPhone}: resp=" . substr($resp ?? '',0,200) . " err=" . $err);
-                    }
-                }
-            }
-        } catch(\Exception $e){
-            \Log::error('Admin SMS send failed: '.$e->getMessage());
+            app(\App\Services\OrderNotificationService::class)
+                ->adminOrderSms($order, $customerName, $customerPhone);
+        } catch (\Exception $e) {
+            \Log::error('Admin SMS send failed: ' . $e->getMessage());
         }
 
         // Incomplete order delete
