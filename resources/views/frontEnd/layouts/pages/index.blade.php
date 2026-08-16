@@ -1,273 +1,509 @@
 @extends('frontEnd.layouts.master')
-
-@section('title', optional($seo)->meta_title ?? (optional($generalsetting)->name ?? 'Home'))
+@section('title', optional($generalsetting)->name ?? 'Online Shop')
 
 @push('seo')
-<meta name="description" content="{{ optional($seo)->meta_description ?? '' }}" />
-<meta name="keywords" content="{{ optional($seo)->meta_tags ?? '' }}" />
-<meta property="og:title" content="{{ optional($seo)->meta_title ?? optional($generalsetting)->name }}" />
-<meta property="og:type" content="website" />
-<meta property="og:url" content="{{ url()->current() }}" />
-<meta property="og:image" content="{{ asset(optional($generalsetting)->og_baner ?? 'public/logo.png') }}" />
+<meta name="description" content="{{ optional($seo)->meta_description ?? 'নির্বাচিত পণ্য, সহজ অর্ডার এবং সারা দেশে দ্রুত ডেলিভারি।' }}">
+@endpush
+
+@push('css')
+<style>
+/* ========================================
+   HOME — DESIGN TOKENS
+   ======================================== */
+.home-v2{background:var(--paper,#fff);overflow:hidden}
+.home-inner{max-width:1240px;margin:0 auto;padding:0 20px}
+
+/* ========================================
+   HERO SECTION
+   ======================================== */
+.home-hero{padding:20px 0 0}
+.hero-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:16px;align-items:stretch}
+.hero-main{border-radius:16px;overflow:hidden;position:relative;min-height:360px}
+.hero-carousel{height:100%}
+.hero-slide{position:relative;overflow:hidden;height:auto;min-height:360px}
+.hero-slide img{width:100%;height:100%;object-fit:cover;display:block;min-height:360px}
+.hero-overlay{position:absolute;inset:0;background:linear-gradient(100deg,rgba(0,0,0,.72) 0%,rgba(0,0,0,.35) 45%,rgba(0,0,0,.08) 100%);z-index:1}
+.hero-content{position:absolute;z-index:2;left:clamp(24px,5vw,56px);bottom:clamp(24px,4vw,52px);color:#fff;max-width:520px}
+.hero-badge{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;font-weight:800;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:99px;padding:6px 14px;backdrop-filter:blur(4px);margin-bottom:12px}
+.hero-content h1{font-size:clamp(1.6rem,3vw,2.8rem);line-height:1.08;font-weight:850;letter-spacing:-.04em;margin:0 0 10px}
+.hero-content>p{margin:0 0 18px;font-size:.95rem;opacity:.88;line-height:1.5}
+.hero-actions{display:flex;gap:10px;flex-wrap:wrap}
+.hero-cta-primary{display:inline-flex;align-items:center;gap:8px;background:#fff;color:#111!important;padding:12px 22px;border-radius:100px;font-weight:800;font-size:.88rem;transition:transform .2s ease,box-shadow .2s ease;box-shadow:0 4px 16px rgba(0,0,0,.2);text-decoration:none}
+.hero-cta-primary:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.hero-cta-secondary{display:inline-flex;align-items:center;gap:8px;background:transparent;color:#fff!important;padding:12px 22px;border-radius:100px;font-weight:700;font-size:.88rem;border:1.5px solid rgba(255,255,255,.4);transition:background .2s ease,border-color .2s ease;text-decoration:none}
+.hero-cta-secondary:hover{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.7)}
+
+/* Owl Carousel Override */
+.hero-main .owl-carousel{height:100%}
+.hero-main .owl-stage-outer{height:100%}
+.hero-main .owl-stage{height:100%}
+.hero-main .owl-item{height:100%}
+.hero-main .owl-dots{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:5;display:flex;gap:6px}
+.hero-main .owl-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.4);transition:all .25s ease}
+.hero-main .owl-dot.active{width:24px;border-radius:99px;background:#fff}
+
+/* Side Cards */
+.hero-side{display:grid;grid-template-rows:1fr 1fr;gap:16px}
+.side-card{border-radius:16px;padding:24px 22px;display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden;transition:transform .2s ease,box-shadow .2s ease;cursor:pointer;text-decoration:none}
+.side-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.1)}
+.side-card.side-deal{background:linear-gradient(135deg,#1a1a2e,#16213e);color:#fff}
+.side-card.side-support{background:var(--soft,#f7f7f7);border:1px solid var(--line,#e8e8e8);color:var(--ink,#1a1a1a)}
+.side-tag{font-size:.68rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;opacity:.7;margin-bottom:6px}
+.side-card h3{font-size:1.15rem;font-weight:800;margin:0 0 6px;line-height:1.25}
+.side-card p{font-size:.85rem;opacity:.75;margin:0 0 14px;line-height:1.4}
+.side-link{font-size:.82rem;font-weight:800;display:inline-flex;align-items:center;gap:6px;transition:gap .2s ease}
+.side-card:hover .side-link{gap:10px}
+.side-deal .side-link{color:#4ade80}
+.side-support .side-link{color:var(--accent,#e53e3e)}
+
+/* ========================================
+   TRUST STRIP
+   ======================================== */
+.trust-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:28px 0 38px}
+.trust-item{background:var(--paper,#fff);border:1px solid var(--line,#e8e8e8);border-radius:14px;padding:16px 14px;display:flex;align-items:center;gap:12px;transition:border-color .2s ease,box-shadow .2s ease}
+.trust-item:hover{border-color:var(--accent,#e53e3e);box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.trust-icon{width:42px;height:42px;display:grid;place-items:center;border-radius:10px;background:var(--soft,#f7f7f7);flex-shrink:0}
+.trust-icon i{font-size:18px;color:var(--accent,#e53e3e)}
+.trust-item strong{display:block;font-size:.82rem;font-weight:800;line-height:1.3}
+.trust-item small{display:block;font-size:.72rem;color:var(--muted,#888);margin-top:2px}
+
+/* ========================================
+   SECTIONS
+   ======================================== */
+.home-section{margin-bottom:40px}
+.section-heading{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px;gap:12px;flex-wrap:wrap}
+.section-heading h2{font-size:1.4rem;margin:0;font-weight:850;letter-spacing:-.02em;color:var(--ink,#1a1a1a);display:flex;align-items:center;gap:8px}
+.section-heading p{margin:3px 0 0;color:var(--muted,#888);font-size:.88rem}
+.section-link{font-weight:750;font-size:.88rem;color:var(--accent,#e53e3e);display:inline-flex;align-items:center;gap:5px;transition:gap .2s ease;white-space:nowrap;text-decoration:none}
+.section-link:hover{gap:9px}
+
+/* ========================================
+   CATEGORIES
+   ======================================== */
+.category-scroll{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+.category-card{background:var(--paper,#fff);border:1px solid var(--line,#e8e8e8);border-radius:14px;padding:12px 8px;text-align:center;transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease;cursor:pointer;text-decoration:none;display:block}
+.category-card:hover{transform:translateY(-3px);border-color:var(--accent,#e53e3e);box-shadow:0 8px 25px rgba(0,0,0,.08)}
+.category-card img{width:72px;height:72px;object-fit:cover;border-radius:12px;display:block;margin:0 auto 8px;background:var(--soft,#f7f7f7)}
+.category-card span{font-size:.82rem;font-weight:750;color:var(--ink,#1a1a1a);display:block;line-height:1.3}
+
+/* ========================================
+   FLASH DEALS
+   ======================================== */
+.flash-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px;flex-wrap:wrap}
+.flash-title-group h2{color:var(--danger,#e53e3e)}
+.flash-title-group h2 i{margin-right:2px}
+.countdown-bar{display:flex;align-items:center;gap:5px}
+.cd-label{font-size:.78rem;font-weight:700;color:var(--muted,#888);margin-right:4px}
+.cd-block{background:var(--ink,#1a1a1a);color:#fff;border-radius:8px;padding:5px 8px;text-align:center;min-width:42px}
+.cd-block span{font-size:1.1rem;font-weight:800;display:block;line-height:1}
+.cd-block small{font-size:.6rem;opacity:.65;text-transform:uppercase;letter-spacing:.04em}
+.cd-sep{font-weight:800;font-size:1.1rem;color:var(--ink,#1a1a1a);margin:0 1px}
+
+/* ========================================
+   PRODUCT GRID
+   ======================================== */
+.product-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+
+/* ========================================
+   AD BANNER
+   ======================================== */
+.ad-banner{border-radius:16px;overflow:hidden;position:relative;display:block}
+.ad-banner img{width:100%;display:block;max-height:220px;object-fit:cover;transition:transform .4s ease}
+.ad-banner:hover img{transform:scale(1.02)}
+
+/* ========================================
+   WHY SHOP WITH US
+   ======================================== */
+.why-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.why-item{text-align:center;padding:28px 16px;border-radius:14px;border:1px solid var(--line,#e8e8e8);background:var(--paper,#fff);transition:transform .2s ease,box-shadow .2s ease}
+.why-item:hover{transform:translateY(-3px);box-shadow:0 8px 25px rgba(0,0,0,.08)}
+.why-icon{width:56px;height:56px;display:grid;place-items:center;border-radius:50%;background:var(--soft,#f7f7f7);margin:0 auto 14px}
+.why-icon i{font-size:22px;color:var(--accent,#e53e3e)}
+.why-item h4{font-size:.92rem;font-weight:800;margin:0 0 6px}
+.why-item p{font-size:.78rem;color:var(--muted,#888);margin:0;line-height:1.5}
+
+/* ========================================
+   CTA BANNER
+   ======================================== */
+.cta-banner{background:var(--ink,#1a1a1a);color:#fff;border-radius:16px;padding:36px 40px;display:flex;justify-content:space-between;align-items:center;gap:24px}
+.cta-banner h2{font-size:1.4rem;font-weight:850;margin:0 0 6px}
+.cta-banner p{margin:0;opacity:.8;font-size:.9rem}
+
+/* ========================================
+   SCROLL REVEAL
+   ======================================== */
+.reveal{opacity:0;transform:translateY(24px);transition:opacity .6s cubic-bezier(.4,0,.2,1),transform .6s cubic-bezier(.4,0,.2,1)}
+.reveal.revealed{opacity:1;transform:translateY(0)}
+
+/* ========================================
+   RESPONSIVE — TABLET
+   ======================================== */
+@media(max-width:991px){
+    .hero-grid{grid-template-columns:1fr}
+    .hero-side{grid-template-columns:1fr 1fr;grid-template-rows:auto}
+    .hero-main{min-height:300px}
+    .hero-slide{min-height:300px}
+    .hero-slide img{min-height:300px}
+    .trust-strip{grid-template-columns:repeat(2,1fr)}
+    .category-scroll{grid-template-columns:repeat(4,1fr)}
+    .product-grid{grid-template-columns:repeat(3,1fr)}
+    .why-grid{grid-template-columns:repeat(2,1fr)}
+}
+
+/* ========================================
+   RESPONSIVE — MOBILE
+   ======================================== */
+@media(max-width:575px){
+    .home-v2{padding-top:0}
+    .home-inner{padding:0 14px}
+    .home-hero{padding:14px 0 0}
+    .hero-main{min-height:260px;border-radius:12px}
+    .hero-slide{min-height:260px}
+    .hero-slide img{min-height:260px}
+    .hero-grid{gap:10px}
+    .hero-side{gap:10px}
+    .side-card{padding:18px 16px}
+    .side-card h3{font-size:1rem}
+    .hero-content h1{font-size:1.3rem}
+    .hero-content>p{font-size:.82rem;margin-bottom:14px}
+    .hero-cta-primary,.hero-cta-secondary{padding:10px 16px;font-size:.8rem}
+    .trust-strip{grid-template-columns:1fr 1fr;gap:8px;margin:20px 0 28px}
+    .trust-item{padding:12px 10px;gap:8px}
+    .trust-item small{display:none}
+    .trust-icon{width:36px;height:36px;border-radius:8px}
+    .trust-icon i{font-size:15px}
+    .category-scroll{display:flex;overflow-x:auto;gap:8px;padding-bottom:6px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+    .category-scroll::-webkit-scrollbar{display:none}
+    .category-scroll .category-card{flex-shrink:0;width:95px;scroll-snap-align:start}
+    .category-scroll .category-card img{width:60px;height:60px}
+    .category-scroll .category-card span{font-size:.75rem}
+    .home-section{margin-bottom:30px}
+    .section-heading h2{font-size:1.15rem}
+    .flash-header{flex-direction:column;align-items:flex-start;gap:10px}
+    .cd-block{padding:4px 6px;min-width:36px}
+    .cd-block span{font-size:.95rem}
+    .product-grid{grid-template-columns:repeat(2,1fr);gap:10px}
+    .why-grid{grid-template-columns:1fr 1fr;gap:10px}
+    .why-item{padding:20px 12px}
+    .why-icon{width:44px;height:44px}
+    .why-icon i{font-size:18px}
+    .cta-banner{padding:24px 20px;flex-direction:column;align-items:flex-start;border-radius:12px}
+    .cta-banner h2{font-size:1.15rem}
+}
+
+@media(max-width:380px){
+    .hero-side{grid-template-columns:1fr}
+}
+</style>
 @endpush
 
 @section('content')
+<div class="home-v2">
 
-@php
-    $flashEnd = optional($generalsetting)->flash_sale_end_date;
-    $dealEnd = optional($generalsetting)->hot_deal_end_date;
-@endphp
-
-<div class="sf-container">
-
-    {{-- ================= HERO ================= --}}
-    <div class="sf-hero">
-        <div class="sf-hero__main" id="sfHero">
-            @forelse($sliders ?? [] as $slider)
-                <div class="sf-hero-slide {{ $loop->first ? 'active' : '' }}">
-                    @if(!empty($slider->link))<a href="{{ $slider->link }}">@endif
-                    <img src="{{ asset($slider->image) }}" alt="Banner" />
-                    @if(!empty($slider->link))</a>@endif
-                </div>
-            @empty
-                <div class="sf-hero-slide active">
-                    <img src="{{ asset('public/frontEnd/images/banner.png') }}" alt="Shop Genie" />
-                </div>
-            @endforelse
-            <button class="sf-hero__nav prev" aria-label="Previous"><i class="fa-solid fa-angle-left"></i></button>
-            <button class="sf-hero__nav next" aria-label="Next"><i class="fa-solid fa-angle-right"></i></button>
-            <div class="sf-hero__dots"></div>
-        </div>
-        <div class="sf-hero__side">
-            @foreach(($campaognads ?? collect())->take(1) as $ad)
-                <a href="{{ $ad->link ?? '#' }}"><img src="{{ asset($ad->image) }}" alt="Ad" /></a>
-            @endforeach
-            @foreach(($sliderbottomads ?? collect())->take(1) as $ad)
-                <a href="{{ $ad->link ?? '#' }}"><img src="{{ asset($ad->image) }}" alt="Ad" /></a>
-            @endforeach
-        </div>
-    </div>
-
-    {{-- ================= CATEGORIES ================= --}}
-    @if(($frontcategory ?? collect())->count())
-        <div class="sf-sec-head">
-            <div>
-                <h2 class="sf-sec-head__ttl">Top Categories</h2>
-                <p class="sf-sec-head__sub">Find everything you need, organised neatly</p>
-            </div>
-            <a class="sf-sec-head__link" href="{{ route('shop') }}">View All <i class="fa-solid fa-arrow-right"></i></a>
-        </div>
-        <div class="sf-catgrid">
-            @foreach($frontcategory as $cat)
-                <a class="sf-cat-tile" href="{{ route('category', $cat->slug) }}">
-                    <span class="ico">
-                        @if(!empty($cat->image))<img src="{{ asset($cat->image) }}" alt="{{ $cat->name }}" loading="lazy" />
-                        @else<i class="fa-solid fa-tag"></i>@endif
-                    </span>
-                    <b>{{ $cat->name }}</b>
-                    <small>{{ optional($cat->products)->count() ?? 0 }}+ items</small>
-                </a>
-            @endforeach
-        </div>
-    @endif
-
-    {{-- ================= REFERENCE PROMOTIONAL BANNERS ================= --}}
-    @php
-        $referencePromos = collect($homepageads ?? [])
-            ->merge(collect($homepageads2 ?? []))
-            ->merge(collect($campaognads ?? []))
-            ->merge(collect($sliderbottomads ?? []))
-            ->unique('image')->take(4);
-    @endphp
-    @if($referencePromos->count())
-        <div class="sf-reference-promos">
-            @foreach($referencePromos as $ad)
-                <a href="{{ $ad->link ?? '#' }}"><img src="{{ asset($ad->image) }}" alt="Promotional banner" loading="lazy"></a>
-            @endforeach
-        </div>
-    @endif
-
-    {{-- ================= FLASH SALE ================= --}}
-    @if(($flas_sales ?? collect())->count())
-        <div class="sf-sec-head">
-            <div>
-                <h2 class="sf-sec-head__ttl">Flash Sale</h2>
-                <p class="sf-sec-head__sub">Deals that vanish fast — grab them now</p>
-            </div>
-            <a class="sf-sec-head__link" href="{{ route('flashsales') }}">View All <i class="fa-solid fa-arrow-right"></i></a>
-        </div>
-        <div class="sf-flash">
-            <div class="sf-flash__head">
-                <div class="sf-flash__ttl"><i class="fa-solid fa-bolt"></i> Limited Time Offers</div>
-                @if($flashEnd)
-                    <div class="sf-flash__timer" data-end="{{ strtotime($flashEnd) * 1000 }}">
-                        <span class="box"><b data-t-d>00</b><small>Days</small></span><span class="sep">:</span>
-                        <span class="box"><b data-t-h>00</b><small>Hours</small></span><span class="sep">:</span>
-                        <span class="box"><b data-t-m>00</b><small>Mins</small></span><span class="sep">:</span>
-                        <span class="box"><b data-t-s>00</b><small>Secs</small></span>
+    {{-- ===== 1. HERO SECTION ===== --}}
+    <section class="home-hero">
+        <div class="home-inner">
+            <div class="hero-grid">
+                {{-- Hero Carousel --}}
+                <div class="hero-main">
+                    @if(count($sliders) > 0)
+                    <div class="hero-carousel owl-carousel owl-theme">
+                        @foreach($sliders as $slider)
+                        <div class="hero-slide">
+                            <img src="{{ asset($slider->image) }}" alt="{{ optional($generalsetting)->name }}" fetchpriority="high">
+                            <div class="hero-overlay"></div>
+                            <div class="hero-content">
+                                <span class="hero-badge"><i class="fa-solid fa-bolt"></i> নির্বাচিত অফার</span>
+                                <h1>{{ $slider->title2 ?? 'পছন্দের পণ্য, সহজে অর্ডার করুন' }}</h1>
+                                <p>{{ $slider->title1 ?? 'মানসম্মত পণ্য, নিরাপদ অর্ডার ও সারা দেশে দ্রুত ডেলিভারি।' }}</p>
+                                <div class="hero-actions">
+                                    <a class="hero-cta-primary" href="{{ $slider->link ?? '#shop-now' }}">Shop Now <i class="fa-solid fa-arrow-right"></i></a>
+                                    <a class="hero-cta-secondary" href="{{ route('hotdeals') }}">View Deals</a>
+                                </div>
+                            </div>
+                        </div>
+                        @endforeach
                     </div>
-                @endif
-                <a class="sf-flash__link" href="{{ route('flashsales') }}">See All Deals <i class="fa-solid fa-arrow-right"></i></a>
-            </div>
-            <div class="sf-flash__body">
-                @foreach($flas_sales->take(4) as $product)
-                    @include('frontEnd.layouts.partials.product-card', ['product' => $product, 'showSold' => true])
-                @endforeach
-            </div>
-        </div>
-    @endif
-
-    {{-- ================= AD STRIP ================= --}}
-    @if(($homepageads2 ?? collect())->count() || ($homepageads ?? collect())->count())
-        <div class="sf-adstrip two" style="grid-template-columns:repeat(2,1fr)">
-            @foreach(($homepageads2 ?? collect())->take(1) as $ad)
-                <a href="{{ $ad->link ?? '#' }}"><img src="{{ asset($ad->image) }}" alt="Ad" /></a>
-            @endforeach
-            @foreach(($homepageads ?? collect())->take(1) as $ad)
-                <a href="{{ $ad->link ?? '#' }}"><img src="{{ asset($ad->image) }}" alt="Ad" /></a>
-            @endforeach
-        </div>
-    @endif
-
-    {{-- ================= HOT DEALS ================= --}}
-    @if(($hotdeal_top ?? collect())->count())
-        <div class="sf-sec-head">
-            <div>
-                <h2 class="sf-sec-head__ttl"><i class="fa-solid fa-fire" style="color:var(--c-accent)"></i> Hot Deals</h2>
-                <p class="sf-sec-head__sub">Most wanted products at the best prices</p>
-            </div>
-            <a class="sf-sec-head__link" href="{{ route('hotdeals') }}">View All <i class="fa-solid fa-arrow-right"></i></a>
-        </div>
-        @if(($hitdealsbaner ?? collect())->count())
-            @foreach($hitdealsbaner->take(1) as $banner)
-                <a class="sf-catsec__banner" href="{{ $banner->link ?? '#' }}"><img src="{{ asset($banner->image) }}" alt="Hot Deals" /></a>
-            @endforeach
-        @endif
-        <div class="sf-owl-nav" style="margin-top:16px">
-            <div class="owl-carousel product_slider">
-                @foreach($hotdeal_top->take(12) as $product)
-                    <div style="padding:4px">
-                        @include('frontEnd.layouts.partials.product-card', ['product' => $product])
+                    @else
+                    <div style="width:100%;min-height:360px;background:#f7f7f7;display:grid;place-items:center;border-radius:16px;color:#888;font-size:14px">
+                        <i class="fa-solid fa-image" style="font-size:40px;opacity:.3"></i>
                     </div>
-                @endforeach
+                    @endif
+                </div>
+
+                {{-- Side Cards --}}
+                <div class="hero-side">
+                    <a class="side-card side-deal" href="{{ route('hotdeals') }}">
+                        <div>
+                            <span class="side-tag"><i class="fa-solid fa-fire"></i> HOT DEALS</span>
+                            <h3>আজকের সেরা ডিল</h3>
+                            <p>বিশেষ দামে নির্বাচিত পণ্য কিনুন, স্টক থাকা পর্যন্ত।</p>
+                            <span class="side-link">Shop Now <i class="fa-solid fa-arrow-right"></i></span>
+                        </div>
+                    </a>
+                    <a class="side-card side-support" href="tel:{{ optional($contact)->hotline }}">
+                        <div>
+                            <span class="side-tag"><i class="fa-solid fa-headset"></i> SUPPORT</span>
+                            <h3>অর্ডারে সাহায্য লাগবে?</h3>
+                            <p>আমাদের team আপনাকে সাহায্য করবে।</p>
+                            <span class="side-link">Call Now <i class="fa-solid fa-phone"></i></span>
+                        </div>
+                    </a>
+                </div>
             </div>
         </div>
-    @endif
+    </section>
 
-    {{-- ================= CATEGORY WISE PRODUCTS ================= --}}
-    @foreach($homeproducts ?? [] as $homesection)
-        @if(($homesection->products ?? collect())->count())
-            <div class="sf-sec-head">
+    <div class="home-inner">
+
+        {{-- ===== 2. TRUST STRIP ===== --}}
+        <section class="trust-strip reveal">
+            <div class="trust-item">
+                <div class="trust-icon"><i class="fa-solid fa-truck-fast"></i></div>
+                <div><strong>দ্রুত ডেলিভারি</strong><small>সারা বাংলাদেশে</small></div>
+            </div>
+            <div class="trust-item">
+                <div class="trust-icon"><i class="fa-solid fa-money-bill-wave"></i></div>
+                <div><strong>Cash on Delivery</strong><small>পণ্য পেয়ে মূল্য দিন</small></div>
+            </div>
+            <div class="trust-item">
+                <div class="trust-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                <div><strong>নিরাপদ কেনাকাটা</strong><small>বিশ্বস্ত order process</small></div>
+            </div>
+            <div class="trust-item">
+                <div class="trust-icon"><i class="fa-solid fa-rotate-left"></i></div>
+                <div><strong>ইজি রিটার্ন</strong><small>সহজ ফেরত নীতি</small></div>
+            </div>
+        </section>
+
+        {{-- ===== 3. POPULAR CATEGORIES ===== --}}
+        <section class="home-section reveal">
+            <div class="section-heading">
                 <div>
-                    <h2 class="sf-sec-head__ttl">{{ $homesection->name }}</h2>
-                    <p class="sf-sec-head__sub">Top picks in {{ $homesection->name }}</p>
-                </div>
-                <a class="sf-sec-head__link" href="{{ route('category', $homesection->slug) }}">View All <i class="fa-solid fa-arrow-right"></i></a>
-            </div>
-            <div class="sf-owl-nav">
-                <div class="owl-carousel product_slider">
-                    @foreach($homesection->products->take(12) as $product)
-                        <div style="padding:4px">
-                            @include('frontEnd.layouts.partials.product-card', ['product' => $product])
-                        </div>
-                    @endforeach
+                    <h2>জনপ্রিয় ক্যাটাগরি</h2>
+                    <p>আপনার প্রয়োজনীয় পণ্য দ্রুত খুঁজে নিন</p>
                 </div>
             </div>
+            <div class="category-scroll">
+                @foreach($menucategories->take(12) as $category)
+                <a class="category-card" href="{{ route('category', $category->slug) }}">
+                    <img loading="lazy" src="{{ asset($category->image) }}" alt="{{ $category->name }}">
+                    <span>{{ Str::limit($category->name, 22) }}</span>
+                </a>
+                @endforeach
+            </div>
+        </section>
+
+        {{-- ===== 4. FLASH DEALS + COUNTDOWN ===== --}}
+        @if(count($hotdeal_top) > 0)
+        <section id="shop-now" class="home-section flash-section reveal">
+            <div class="flash-header">
+                <div class="flash-title-group">
+                    <h2><i class="fa-solid fa-bolt"></i> Flash Deals</h2>
+                    <p>স্টক শেষ হওয়ার আগে অর্ডার করুন</p>
+                </div>
+                <div class="countdown-bar">
+                    <span class="cd-label">শেষ সময়:</span>
+                    <div class="cd-block"><span class="cd-hours">00</span><small>ঘণ্টা</small></div>
+                    <span class="cd-sep">:</span>
+                    <div class="cd-block"><span class="cd-mins">00</span><small>মিনিট</small></div>
+                    <span class="cd-sep">:</span>
+                    <div class="cd-block"><span class="cd-secs">00</span><small>সেকেন্ড</small></div>
+                </div>
+                <a class="section-link" href="{{ route('hotdeals') }}">সব দেখুন <i class="fa-solid fa-arrow-right"></i></a>
+            </div>
+            <div class="product-grid">
+                @foreach($hotdeal_top as $product)
+                    @include('frontEnd.layouts.partials.product-card', ['product'=>$product])
+                @endforeach
+            </div>
+        </section>
         @endif
-    @endforeach
 
-    {{-- ================= ALL PRODUCTS ================= --}}
-    @if(($all_products ?? collect())->count())
-        <div class="sf-sec-head">
-            <div>
-                <h2 class="sf-sec-head__ttl">Just For You</h2>
-                <p class="sf-sec-head__sub">Handpicked products you might love</p>
+        {{-- ===== 6. AD BANNER ===== --}}
+        @if(count($sliderbottomads) > 0)
+        @php
+            $ad = $sliderbottomads->first();
+        @endphp
+        <section class="home-section reveal">
+            <a href="{{ $ad->link ?? '#' }}" class="ad-banner">
+                <img loading="lazy" src="{{ asset($ad->image) }}" alt="বিশেষ অফার">
+            </a>
+        </section>
+        @endif
+
+        {{-- ===== 7. DYNAMIC HOME CATEGORY PRODUCTS ===== --}}
+        @if($homeproducts)
+        @foreach($homeproducts as $homecat)
+        @if(count($homecat->products) > 0)
+        <section class="home-section reveal">
+            <div class="section-heading">
+                <div>
+                    <h2>{{ $homecat->name }}</h2>
+                    <p>আপনার জন্য বাছাই করা পণ্য</p>
+                </div>
+                <a class="section-link" href="{{ route('category', $homecat->slug) }}">সব দেখুন <i class="fa-solid fa-arrow-right"></i></a>
             </div>
-            <a class="sf-sec-head__link" href="{{ route('shop') }}">View All <i class="fa-solid fa-arrow-right"></i></a>
-        </div>
-        <div class="sf-pgrid">
-            @foreach($all_products->take(8) as $product)
-                @include('frontEnd.layouts.partials.product-card', ['product' => $product])
-            @endforeach
-        </div>
-    @endif
-
-    {{-- ================= BRANDS ================= --}}
-    @if(($brands ?? collect())->count())
-        <div class="sf-sec-head">
-            <div>
-                <h2 class="sf-sec-head__ttl">Top Brands</h2>
-                <p class="sf-sec-head__sub">Shop from brands you trust</p>
+            <div class="product-grid">
+                @foreach($homecat->products as $product)
+                    @include('frontEnd.layouts.partials.product-card', ['product'=>$product])
+                @endforeach
             </div>
-        </div>
-        <div class="sf-brands">
-            @foreach($brands->take(6) as $brand)
-                <a class="sf-brand" href="{{ route('brand.products', $brand->slug) }}">
-                    <img src="{{ asset($brand->image) }}" alt="{{ $brand->name }}" loading="lazy" />
-                </a>
-            @endforeach
-        </div>
-    @endif
+        </section>
+        @endif
+        @endforeach
+        @endif
 
-    {{-- ================= VENDOR SHOPS ================= --}}
-    @if(($vendors ?? collect())->count() && ($generalsetting?->vendor_enabled ?? 1) == 1)
-        <div class="sf-sec-head">
-            <div>
-                <h2 class="sf-sec-head__ttl">Featured Shops</h2>
-                <p class="sf-sec-head__sub">Verified sellers with great ratings</p>
+        {{-- ===== 8. WHY SHOP WITH US ===== --}}
+        <section class="home-section reveal">
+            <div class="section-heading">
+                <div>
+                    <h2>কেন আমাদের থেকে কিনবেন?</h2>
+                    <p>আমরা আপনার সেরা শপিং অভিজ্ঞতা নিশ্চিত করি</p>
+                </div>
             </div>
-            <a class="sf-sec-head__link" href="{{ route('sellers') }}">View All <i class="fa-solid fa-arrow-right"></i></a>
-        </div>
-        <div class="sf-shops">
-            @foreach($vendors->take(3) as $vendor)
-                <a class="sf-shop" href="{{ route('vendor.shop', $vendor->slug) }}">
-                    <img class="logo" src="{{ asset($vendor->logo ?? 'public/logo.png') }}" alt="{{ $vendor->shop_name }}" />
-                    <div>
-                        <b>{{ $vendor->shop_name }}</b>
-                        <small>{{ $vendor->products_count }}+ products</small>
-                        <div class="sf-stars" style="margin-top:3px">
-                            @for($i = 1; $i <= 5; $i++)<i class="fa-solid fa-star {{ $i <= round($vendor->average_rating ?? 0) ? 'on' : '' }}"></i>@endfor
-                            <span class="sf-faint" style="margin-left:5px">{{ $vendor->average_rating ?? 0 }} ({{ $vendor->total_reviews ?? 0 }})</span>
-                        </div>
-                    </div>
-                    <span class="sf-btn sf-btn--outline sf-btn--sm">Visit Shop</span>
-                </a>
-            @endforeach
-        </div>
-    @endif
-
-    {{-- ================= BLOGS ================= --}}
-    @if(($blogs ?? collect())->count())
-        <div class="sf-sec-head">
-            <div>
-                <h2 class="sf-sec-head__ttl">From Our Blog</h2>
-                <p class="sf-sec-head__sub">Tips, guides and shopping ideas</p>
+            <div class="why-grid">
+                <div class="why-item">
+                    <div class="why-icon"><i class="fa-solid fa-truck-fast"></i></div>
+                    <h4>দ্রুত ডেলিভারি</h4>
+                    <p>ঢাকায় ২৪-৪৮ ঘণ্টা, সারা দেশে ৩-৫ দিনে পৌঁছে যাবে</p>
+                </div>
+                <div class="why-item">
+                    <div class="why-icon"><i class="fa-solid fa-rotate-left"></i></div>
+                    <h4>ইজি রিটার্ন</h4>
+                    <p>পণ্যে সমস্যা হলে সহজেই ফেরত দিন, কোনো ঝামেলা নেই</p>
+                </div>
+                <div class="why-item">
+                    <div class="why-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                    <h4>নিরাপদ পেমেন্ট</h4>
+                    <p>ক্যাশ অন ডেলিভারি — পণ্য হাতে পেয়ে মূল্য দিন</p>
+                </div>
+                <div class="why-item">
+                    <div class="why-icon"><i class="fa-solid fa-headset"></i></div>
+                    <h4>সহায়তা</h4>
+                    <p>যেকোনো সমস্যায় আমাদের সাথে যোগাযোগ করুন</p>
+                </div>
             </div>
-            <a class="sf-sec-head__link" href="{{ route('blogs') }}">View All <i class="fa-solid fa-arrow-right"></i></a>
-        </div>
-        <div class="sf-blogs">
-            @foreach($blogs->take(3) as $blog)
-                <article class="sf-blog">
-                    <a href="{{ route('blog.details', $blog->slug) }}"><img src="{{ asset($blog->image) }}" alt="{{ $blog->title }}" loading="lazy" /></a>
-                    <div class="sf-blog__body">
-                        <h4><a href="{{ route('blog.details', $blog->slug) }}">{{ $blog->title }}</a></h4>
-                        <p class="sf-clamp-2">{{ Str::limit(strip_tags($blog->description ?? ''), 110) }}</p>
-                        <div class="sf-blog__meta">
-                            <span><i class="fa-regular fa-calendar" style="margin-right:5px"></i>{{ optional($blog->created_at)->format('M d, Y') }}</span>
-                        </div>
-                    </div>
-                </article>
-            @endforeach
-        </div>
-    @endif
+        </section>
 
-    {{-- ================= TRUST STRIP ================= --}}
-    <div class="sf-trust">
-        <div class="sf-feature"><i class="fa-solid fa-medal"></i><div><b>Genuine Products</b><small>100% authentic items</small></div></div>
-        <div class="sf-feature"><i class="fa-solid fa-hand-holding-dollar"></i><div><b>Best Prices</b><small>Unbeatable value daily</small></div></div>
-        <div class="sf-feature"><i class="fa-solid fa-credit-card"></i><div><b>Easy Payments</b><small>bKash, Nagad, COD</small></div></div>
-        <div class="sf-feature"><i class="fa-solid fa-headset"></i><div><b>Human Support</b><small>Real people, real help</small></div></div>
+        {{-- ===== 9. CTA BANNER ===== --}}
+        <section class="home-section reveal">
+            <div class="cta-banner">
+                <div>
+                    <h2>পছন্দের পণ্য খুঁজে পাচ্ছেন না?</h2>
+                    <p>আমাদের সাথে যোগাযোগ করুন — সঠিক পণ্যটি খুঁজতে সাহায্য করব।</p>
+                </div>
+                <a class="hero-cta-primary" href="{{ route('contact') }}">যোগাযোগ করুন <i class="fa-solid fa-arrow-right"></i></a>
+            </div>
+        </section>
+
     </div>
-
 </div>
 @endsection
+
+@push('script')
+<script>
+(function($){
+    /* ---- Hero Carousel ---- */
+    function initHeroCarousel(){
+        var $carousel = $('.hero-carousel');
+        if (!$carousel.length) return;
+        var slideCount = $carousel.find('.hero-slide').length;
+        if (slideCount === 0) return;
+
+        var opts = {
+            items: 1,
+            loop: slideCount > 1,
+            autoplay: slideCount > 1,
+            autoplayTimeout: 5000,
+            dots: slideCount > 1,
+            nav: false,
+            smartSpeed: 600,
+            autoplayHoverPause: true,
+            touchDrag: true,
+            mouseDrag: false,
+            autoHeight: false,
+            callbacks: true
+        };
+
+        $carousel.owlCarousel(opts);
+
+        /* Force height fix after init */
+        setTimeout(function(){
+            var firstImg = $carousel.find('.hero-slide img').first();
+            if (firstImg.length && firstImg[0].complete) {
+                var h = firstImg.height();
+                if (h > 100) {
+                    $carousel.css('height', h + 'px');
+                    $carousel.find('.owl-stage-outer').css('height', h + 'px');
+                }
+            }
+        }, 300);
+    }
+
+    /* Wait for images then init */
+    if ($('.hero-carousel').length) {
+        var heroImages = $('.hero-carousel .hero-slide img');
+        var loaded = 0;
+        var total = heroImages.length;
+        if (total === 0) { initHeroCarousel(); }
+        else {
+            heroImages.each(function(){
+                if (this.complete) { loaded++; }
+                else {
+                    $(this).on('load error', function(){ loaded++; if(loaded>=total) initHeroCarousel(); });
+                }
+            });
+            if (loaded >= total) initHeroCarousel();
+            /* Fallback — init after 3s even if images not loaded */
+            setTimeout(initHeroCarousel, 3000);
+        }
+    }
+
+    /* ---- Flash Deal Countdown ---- */
+    function startCountdown() {
+        var hEl = document.querySelector('.cd-hours');
+        var mEl = document.querySelector('.cd-mins');
+        var sEl = document.querySelector('.cd-secs');
+        if (!hEl || !mEl || !sEl) return;
+
+        function pad(n) { return n.toString().padStart(2, '0'); }
+
+        setInterval(function() {
+            var now = new Date();
+            var midnight = new Date();
+            midnight.setHours(24, 0, 0, 0);
+            var diff = Math.max(0, midnight - now);
+            var h = Math.floor(diff / 3600000);
+            var m = Math.floor((diff % 3600000) / 60000);
+            var s = Math.floor((diff % 60000) / 1000);
+            hEl.textContent = pad(h);
+            mEl.textContent = pad(m);
+            sEl.textContent = pad(s);
+        }, 1000);
+    }
+    startCountdown();
+
+    /* ---- Scroll Reveal ---- */
+    if ('IntersectionObserver' in window) {
+        var observer = new IntersectionObserver(function(entries) {
+            entries.forEach(function(entry) {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('revealed');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.08, rootMargin: '0px 0px -30px 0px' });
+
+        document.querySelectorAll('.reveal').forEach(function(el) {
+            observer.observe(el);
+        });
+    } else {
+        document.querySelectorAll('.reveal').forEach(function(el) {
+            el.classList.add('revealed');
+        });
+    }
+
+})(jQuery);
+</script>
+@endpush
