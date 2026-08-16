@@ -12,7 +12,7 @@ class VendorMiddleware
     /**
      * Ensure the user is authenticated with admin guard and has vendor role.
      * 
-     * Laravel 12: Explicitly use admin guard for consistency with reseller/admin middleware
+     * Laravel 12: Explicitly use admin guard for consistency with admin middleware
      */
     public function handle(Request $request, Closure $next)
     {

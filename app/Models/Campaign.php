@@ -11,6 +11,16 @@ class Campaign extends Model
 
     protected $guarded = [];
 
+    protected function casts(): array
+    {
+        return [
+            'status' => 'boolean',
+            'is_published' => 'boolean',
+            'published_at' => 'datetime',
+            'custom_page_published_at' => 'datetime',
+        ];
+    }
+
     public function product()
     {
         return $this->hasOne(Product::class, 'id', 'product_id')
@@ -47,5 +57,16 @@ class Campaign extends Model
                 'image',
                 'campaign_id'
             );
+    }
+
+    public function orderBumps()
+    {
+        return $this->hasMany(OrderBump::class, 'campaign_id');
+    }
+
+    public function isCustomPageLive(): bool
+    {
+        return $this->custom_page_published_at !== null
+            && filled($this->custom_html);
     }
 }

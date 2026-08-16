@@ -27,6 +27,14 @@ class IncompleteOrder extends Model
         'product_image',
         'product_link',
         'total_amount',
+        'campaign_id',
+        'source',
+        'device_type',
+        'device_name',
+        'ip_address',
+        'user_agent',
+        'checkout_started_at',
+        'last_activity_at',
         // ⭐ রিকভারি ট্র্যাকিং
         'recovery_status',
         'recovery_note',
@@ -52,6 +60,8 @@ class IncompleteOrder extends Model
             'items' => 'array',
             'total_amount' => 'float',
             'contacted_at' => 'datetime',
+            'checkout_started_at' => 'datetime',
+            'last_activity_at' => 'datetime',
         ];
     }
 

@@ -33,9 +33,6 @@ return Application::configure(basePath: dirname(__DIR__))
         // =================================================================
         // 🌐 Web Middleware Group
         // =================================================================
-        $middleware->web(prepend: [
-            \App\Http\Middleware\ResellerCustomDomain::class,
-        ]);
         $middleware->web(append: [
             \App\Http\Middleware\EncryptCookies::class,
             \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
@@ -79,7 +76,6 @@ return Application::configure(basePath: dirname(__DIR__))
             'lock' => \App\Http\Middleware\LockAccount::class,
             'customer' => \App\Http\Middleware\Customer::class,
             'vendor' => \App\Http\Middleware\VendorMiddleware::class,
-            'reseller' => \App\Http\Middleware\ResellerMiddleware::class,
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
             'ipcheck' => \App\Http\Middleware\IpFilter::class,
             'check_refer' => \App\Http\Middleware\CheckReffer::class,

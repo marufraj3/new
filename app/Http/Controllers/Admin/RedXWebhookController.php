@@ -13,7 +13,6 @@ use App\Models\VendorWallet;
 use App\Models\VendorWalletTransaction;
 use App\Models\SmsGateway;
 use App\Models\GeneralSetting;
-use App\Models\User;
 use App\Services\RedXService;
 use Illuminate\Support\Facades\Log;
 
@@ -78,10 +77,6 @@ class RedXWebhookController extends Controller
                 // Handle stock change (same logic as OrderController)
                 $this->handleStockChange($order, $oldStatus, $newOrderStatus);
 
-                if ($newOrderStatus == 11) {
-                    \App\Helpers\ResellerOrderHelper::deductDeliveryChargeOnCancel($order);
-                }
-
                 // If order is delivered/completed (status = 6)
                 if ($newOrderStatus == 6 && $oldStatus != 6) {
                     // Add money to fund
@@ -97,8 +92,6 @@ class RedXWebhookController extends Controller
                     // Credit vendors for their items
                     $this->distributeVendorEarnings($order);
                     
-                    // Credit reseller wallet if this is a reseller order
-                    $this->creditResellerWallet($order);
                 }
 
                 // Send SMS notification if configured
@@ -250,72 +243,6 @@ class RedXWebhookController extends Controller
                 ]);
             }
         }
-    }
-
-    /**
-     * Credit reseller wallet when order is delivered
-     * Same logic as OrderController
-     */
-    private function creditResellerWallet(Order $order): void
-    {
-        // Check if this is a reseller order
-        if (!$order->reseller_profit || $order->reseller_profit <= 0) {
-            return;
-        }
-
-        // Check if already credited
-        if ($order->reseller_wallet_credited) {
-            return;
-        }
-
-        // Get reseller user
-        $resellerUser = null;
-        if ($order->user_id) {
-            $resellerUser = User::find($order->user_id);
-            if ($resellerUser && 
-                ($resellerUser->hasRole('reseller') || 
-                 (isset($resellerUser->role) && strtolower($resellerUser->role) === 'reseller'))) {
-                // Reseller found
-            } else {
-                $resellerUser = null;
-            }
-        }
-
-        // Fallback: Check customer email (for old orders)
-        if (!$resellerUser && $order->customer && $order->customer->email) {
-            $resellerUser = User::where('email', $order->customer->email)
-                ->where(function($query) {
-                    $query->where('role', 'reseller')
-                          ->orWhereHas('roles', function($q) {
-                              $q->where('name', 'reseller');
-                          });
-                })
-                ->first();
-        }
-
-        if (!$resellerUser) {
-            return;
-        }
-
-        // Credit reseller wallet
-        $resellerUser->wallet_balance = ($resellerUser->wallet_balance ?? 0) + $order->reseller_profit;
-        $resellerUser->save();
-
-        \App\Models\ResellerWalletTransaction::log(
-            $resellerUser->id, 'order_profit', (float) $order->reseller_profit,
-            'Order', $order->id,
-            'অর্ডার #' . ($order->invoice_id ?? $order->id) . ' প্রফিট'
-        );
-
-        // Mark as credited
-        $order->reseller_wallet_credited = true;
-        $order->save();
-
-        Log::info('Reseller wallet credited via RedX webhook', [
-            'order_id' => $order->id,
-            'reseller_id' => $resellerUser->id,
-            'amount' => $order->reseller_profit
-        ]);
     }
 
     /**

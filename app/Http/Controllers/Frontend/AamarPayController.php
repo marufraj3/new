@@ -64,7 +64,7 @@ class AamarPayController extends Controller
         if (Session::has('payable_amount') && Session::get('payable_amount') > 0) {
             $amount = (float) Session::get('payable_amount');
         } elseif ($order->customer_payable_amount) {
-            // Reseller order: use customer_payable_amount (includes shipping charge)
+            // Use preserved customer_payable_amount when a historical order has one.
             $amount = (float) $order->customer_payable_amount;
         } else {
             $amount = (float) $order->amount;
@@ -281,7 +281,7 @@ class AamarPayController extends Controller
             Session::forget(['payable_amount', 'aamarpay_tran_id', 'aamarpay_order_id']);
 
             Toastr::success('Thanks, Your payment was successful!', 'Success!');
-            $redirectRoute = ($order->reseller_profit) ? 'reseller.order.success' : 'customer.order_success';
+            $redirectRoute = 'customer.order_success';
             return redirect()->route($redirectRoute, $order->id);
 
         } else {
@@ -293,7 +293,7 @@ class AamarPayController extends Controller
             Session::forget(['payable_amount', 'aamarpay_tran_id', 'aamarpay_order_id']);
 
             Toastr::error('Payment failed or incomplete.', 'Failed!');
-            $redirectRoute = ($order->reseller_profit) ? 'reseller.order.success' : 'customer.order_success';
+            $redirectRoute = 'customer.order_success';
             return redirect()->route($redirectRoute, $order->id);
         }
     }
@@ -323,7 +323,7 @@ class AamarPayController extends Controller
         Toastr::error('Payment failed. Please try again.', 'Failed!');
 
         if ($orderId && $order) {
-            $redirectRoute = ($order->reseller_profit) ? 'reseller.order.success' : 'customer.order_success';
+            $redirectRoute = 'customer.order_success';
             return redirect()->route($redirectRoute, $orderId);
         }
 
@@ -354,7 +354,7 @@ class AamarPayController extends Controller
         Toastr::error('Payment cancelled by user.', 'Cancelled!');
         
         if ($orderId && $order) {
-            $redirectRoute = ($order->reseller_profit) ? 'reseller.order.success' : 'customer.order_success';
+            $redirectRoute = 'customer.order_success';
             return redirect()->route($redirectRoute, $orderId);
         }
         

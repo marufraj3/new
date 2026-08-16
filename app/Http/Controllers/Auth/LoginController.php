@@ -35,7 +35,10 @@ class LoginController extends Controller
         
         // ✅ Fast role checks (cached by Spatie)
         if ($user->hasRole('reseller') || (isset($user->role) && strtolower($user->role) === 'reseller')) {
-            return redirect()->route('reseller.dashboard');
+            Auth::guard('admin')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+            return redirect()->route('login')->withErrors(['email' => 'The reseller portal is no longer available.']);
         }
 
         if ($user->hasRole('vendor')) {
@@ -91,9 +94,12 @@ class LoginController extends Controller
                     return redirect()->route('admin.dashboard');
                 }
                 
-                // If reseller is logged in, redirect to reseller dashboard
+                // Retired reseller sessions are logged out; the old dashboard no longer exists.
                 if ($user->hasRole('reseller') || $user->role === 'reseller') {
-                    return redirect()->route('reseller.dashboard');
+                    Auth::guard('admin')->logout();
+                    $request->session()->invalidate();
+                    $request->session()->regenerateToken();
+                    return $next($request);
                 }
                 // If vendor is logged in, allow admin to login (will logout vendor on login attempt)
                 if ($user->hasRole('vendor')) {

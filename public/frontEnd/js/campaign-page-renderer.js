@@ -339,7 +339,13 @@
                 qty: state.qty
             });
             selectedProductId = String(product.id);
-            confirmedSelection = { productId: String(product.id), size: state.size, color: state.color, qty: state.qty, price: state.price };
+            confirmedSelection = {
+                productId: String(product.id),
+                size: productSizes(product).find(item => String(item.id) === String(state.size)) || null,
+                color: productColors(product).find(item => String(item.id) === String(state.color)) || null,
+                qty: state.qty,
+                price: state.price
+            };
             variantSelectionSynced = true;
             replaceCart(html);
             updateSelectedCards(product.id);
@@ -629,7 +635,7 @@
                 product_image: item.image,
                 product_link: item.link,
                 total_amount: Number((item.price * item.qty).toFixed(2)),
-                source: 'campaign_builder'
+                source: 'campaign_' + String(campaign.page_type || 'builder')
             };
         }
 
@@ -656,8 +662,13 @@
                         'X-CSRF-TOKEN': csrfToken
                     },
                     body: key
-                }).catch(() => {});
-            } catch (_) { /* ক্যাপচার ব্যর্থ হলে চেকআউট কখনোই ব্লক হবে না */ }
+                }).then(response => {
+                    if (!response.ok) lastPayloadKey = '';
+                }).catch(() => { lastPayloadKey = ''; });
+            } catch (_) {
+                lastPayloadKey = '';
+                /* ক্যাপচার ব্যর্থ হলে চেকআউট কখনোই ব্লক হবে না */
+            }
         }
 
         function schedule() {

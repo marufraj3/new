@@ -8,6 +8,8 @@ use App\Models\Product;
 use App\Models\CampaignReview;
 use App\Models\Campaign;
 use App\Services\CampaignPageSanitizer;
+use App\Services\CampaignCustomPageService;
+use App\Models\OrderBump;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Image;
@@ -15,6 +17,7 @@ use Toastr;
 use Str;
 use File;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class CampaignController extends Controller
 {
@@ -49,6 +52,222 @@ class CampaignController extends Controller
 
         return view('backEnd.campaign.analytics', compact('campaign', 'summary', 'daily', 'days'));
     }
+    /**
+     * Clone a complete campaign into an unpublished marketing variant.
+     */
+    public function duplicate($id)
+    {
+        $source = Campaign::with(['images', 'products'])->findOrFail($id);
+
+        $copy = DB::transaction(function () use ($source) {
+            $campaign = $source->replicate(['slug', 'created_at', 'updated_at']);
+            $campaign->name = $this->uniqueCopyName($source->name);
+            $campaign->slug = $this->uniqueCampaignSlug(Str::slug($campaign->name));
+            $campaign->status = false;
+            $campaign->is_published = false;
+            $campaign->published_at = null;
+
+            foreach (['banner', 'image_one', 'image_two', 'image_three'] as $field) {
+                if (!empty($source->{$field})) {
+                    $campaign->{$field} = $this->copyCampaignMedia($source->{$field});
+                }
+            }
+            $campaign->save();
+
+            // The primary product lives on campaigns; all additional products live on the pivot.
+            $campaign->products()->sync($source->products->pluck('id')->all());
+
+            foreach ($source->images as $review) {
+                $clone = $review->replicate(['campaign_id', 'created_at', 'updated_at']);
+                $clone->campaign_id = $campaign->id;
+                $clone->image = $this->copyCampaignMedia($review->image);
+                $clone->save();
+            }
+
+            if (Schema::hasTable('order_bumps')) {
+                OrderBump::where('campaign_id', $source->id)->get()->each(function (OrderBump $bump) use ($campaign) {
+                    $clone = $bump->replicate(['campaign_id', 'impressions', 'conversions', 'created_at', 'updated_at']);
+                    $clone->campaign_id = $campaign->id;
+                    $clone->impressions = 0;
+                    $clone->conversions = 0;
+                    $clone->save();
+                });
+            }
+
+            return $campaign;
+        });
+
+        Toastr::success('Campaign duplicated as an unpublished version.', 'Success');
+        return redirect()->route('campaign.edit', $copy->id);
+    }
+
+    public function customBuilder($id)
+    {
+        $campaign = Campaign::with(['images', 'products.image', 'product.image'])->findOrFail($id);
+        $productIds = $campaign->products->pluck('id')->push($campaign->product_id)->filter()->unique();
+        $products = Product::whereIn('id', $productIds)->with('image')->get();
+        $primaryProduct = $products->firstWhere('id', $campaign->product_id) ?: $products->first();
+
+        return view('backEnd.campaign.custom-builder', compact('campaign', 'products', 'primaryProduct'));
+    }
+
+    public function saveCustomDraft(Request $request, $id, CampaignCustomPageService $service)
+    {
+        $campaign = Campaign::findOrFail($id);
+        $source = $this->validatedCustomSource($request, $service);
+
+        $campaign->forceFill([
+            'custom_html_draft' => $source['html'],
+            'custom_css_draft' => $source['css'],
+            'custom_js_draft' => $source['js'],
+        ])->save();
+
+        Toastr::success('Custom landing page draft saved.', 'Success');
+        return redirect()->route('campaign.custom-builder', $campaign->id);
+    }
+
+    public function uploadCustomSource(Request $request, $id, CampaignCustomPageService $service)
+    {
+        $campaign = Campaign::findOrFail($id);
+        $request->validate([
+            'html_file' => ['nullable', 'file', 'max:4096'],
+            'css_file' => ['nullable', 'file', 'max:1024'],
+            'js_file' => ['nullable', 'file', 'max:1024'],
+        ]);
+
+        if (!$request->hasFile('html_file') && !$request->hasFile('css_file') && !$request->hasFile('js_file')) {
+            throw ValidationException::withMessages(['html_file' => 'Choose at least one HTML, CSS, or JavaScript file.']);
+        }
+
+        $draft = [
+            'html' => $campaign->custom_html_draft,
+            'css' => $campaign->custom_css_draft,
+            'js' => $campaign->custom_js_draft,
+        ];
+
+        if ($request->hasFile('html_file')) {
+            $file = $request->file('html_file');
+            $this->assertCodeExtension($file->getClientOriginalExtension(), ['html', 'htm'], 'HTML');
+            $split = $service->splitHtmlUpload((string) file_get_contents($file->getRealPath()));
+            $draft['html'] = $split['html'];
+            if (filled($split['css'])) $draft['css'] = $split['css'];
+            if (filled($split['js'])) $draft['js'] = $split['js'];
+        }
+        if ($request->hasFile('css_file')) {
+            $file = $request->file('css_file');
+            $this->assertCodeExtension($file->getClientOriginalExtension(), ['css'], 'CSS');
+            $draft['css'] = $service->cleanCss((string) file_get_contents($file->getRealPath()));
+        }
+        if ($request->hasFile('js_file')) {
+            $file = $request->file('js_file');
+            $this->assertCodeExtension($file->getClientOriginalExtension(), ['js', 'mjs'], 'JavaScript');
+            $draft['js'] = $service->cleanJs((string) file_get_contents($file->getRealPath()));
+        }
+
+        $campaign->forceFill([
+            'custom_html_draft' => $draft['html'],
+            'custom_css_draft' => $draft['css'],
+            'custom_js_draft' => $draft['js'],
+        ])->save();
+
+        Toastr::success('Source files imported into the draft editors.', 'Success');
+        return redirect()->route('campaign.custom-builder', $campaign->id);
+    }
+
+    public function publishCustom($id)
+    {
+        $campaign = Campaign::findOrFail($id);
+        if (blank($campaign->custom_html_draft)) {
+            throw ValidationException::withMessages(['custom_html' => 'Add HTML and save the draft before publishing.']);
+        }
+
+        $campaign->forceFill([
+            'custom_html' => $campaign->custom_html_draft,
+            'custom_css' => $campaign->custom_css_draft,
+            'custom_js' => $campaign->custom_js_draft,
+            'custom_page_published_at' => now(),
+            'is_published' => true,
+            'published_at' => now(),
+            'status' => true,
+        ])->save();
+
+        Toastr::success('Custom landing page published.', 'Live');
+        return redirect()->route('campaign.custom-builder', $campaign->id);
+    }
+
+    public function unpublish($id)
+    {
+        $campaign = Campaign::findOrFail($id);
+        $campaign->forceFill(['is_published' => false, 'published_at' => null])->save();
+
+        Toastr::success('Landing page unpublished. Its draft and database data are preserved.', 'Success');
+        return redirect()->back();
+    }
+
+    private function validatedCustomSource(Request $request, CampaignCustomPageService $service): array
+    {
+        $validated = $request->validate([
+            'custom_html' => ['nullable', 'string', 'max:4194304'],
+            'custom_css' => ['nullable', 'string', 'max:1048576'],
+            'custom_js' => ['nullable', 'string', 'max:1048576'],
+        ]);
+
+        return [
+            'html' => $service->cleanHtml($validated['custom_html'] ?? null),
+            'css' => $service->cleanCss($validated['custom_css'] ?? null),
+            'js' => $service->cleanJs($validated['custom_js'] ?? null),
+        ];
+    }
+
+    private function assertCodeExtension(string $extension, array $allowed, string $label): void
+    {
+        if (!in_array(strtolower($extension), $allowed, true)) {
+            throw ValidationException::withMessages(['html_file' => "The {$label} file extension is not supported."]);
+        }
+    }
+
+    private function uniqueCopyName(string $name): string
+    {
+        $base = Str::limit($name, 220, '') . ' Copy';
+        $candidate = $base;
+        $number = 2;
+        while (Campaign::where('name', $candidate)->exists()) {
+            $candidate = $base . ' ' . $number++;
+        }
+        return $candidate;
+    }
+
+    private function uniqueCampaignSlug(string $base): string
+    {
+        $base = $base !== '' ? $base : 'campaign';
+        $candidate = $base;
+        $number = 2;
+        while (Campaign::where('slug', $candidate)->exists()) {
+            $candidate = $base . '-' . $number++;
+        }
+        return $candidate;
+    }
+
+    private function copyCampaignMedia(?string $path): ?string
+    {
+        if (!$path || preg_match('#^https?://#i', $path) || !File::exists($path)) {
+            return $path;
+        }
+
+        $directory = str_replace('\\', '/', dirname($path));
+        $extension = pathinfo($path, PATHINFO_EXTENSION);
+        $filename = pathinfo($path, PATHINFO_FILENAME) . '-copy-' . Str::lower(Str::random(8));
+        $target = $directory . '/' . $filename . ($extension ? '.' . $extension : '');
+
+        try {
+            File::ensureDirectoryExists($directory);
+            return File::copy($path, $target) ? $target : $path;
+        } catch (\Throwable $exception) {
+            report($exception);
+            return $path;
+        }
+    }
+
     public function create()
     {
         $products = Product::where(['status'=>1])->select('id','name','status')->get();
@@ -406,6 +625,10 @@ class CampaignController extends Controller
             'page_design' => $design,
             'page_html'   => $html,
             'page_css'    => $css,
+            'custom_page_published_at' => null,
+            'is_published' => true,
+            'published_at' => now(),
+            'status' => true,
         ])->save();
 
         return response()->json([
@@ -417,7 +640,7 @@ class CampaignController extends Controller
     }
 
     /**
-     * Disable the visual page and immediately restore the existing legacy campaign view.
+     * Clear the visual page so the published custom source or premium template can render.
      */
     public function clearBuilder($id)
     {
@@ -430,7 +653,7 @@ class CampaignController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Visual design cleared. The legacy campaign page is active again.',
+            'message' => 'Visual design cleared. The custom source or premium template is now active.',
         ]);
     }
 
@@ -480,8 +703,10 @@ class CampaignController extends Controller
     }
     public function active(Request $request)
     {
-        $active = Campaign::find($request->hidden_id);
+        $active = Campaign::findOrFail($request->hidden_id);
         $active->status = 1;
+        $active->is_published = true;
+        $active->published_at = now();
         $active->save();
         Toastr::success('Success','Data active successfully');
         return redirect()->back();

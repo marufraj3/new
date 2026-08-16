@@ -1,1 +1,0 @@
-<?php echo e(Cart::instance('shopping')->count()); ?><?php /**PATH /home/creativedesignbd/myshop1.creativedesign.com.bd/resources/views/frontEnd/layouts/ajax/mobilecart_qty.blade.php ENDPATH**/ ?>

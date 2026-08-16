@@ -294,7 +294,7 @@
                 <div class="card-body p-4">
 
                     <p class="text-muted small">
-                        রিসেলার, পাইকারি ক্রেতা বা নিজেদের টেস্ট নম্বর এখানে যোগ করুন।
+                        পাইকারি ক্রেতা বা নিজেদের টেস্ট নম্বর এখানে যোগ করুন।
                         এই নম্বরগুলো যতবার খুশি অর্ডার করতে পারবে — সীমা তাদের ওপর প্রযোজ্য হবে না।
                     </p>
 
@@ -311,7 +311,7 @@
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label fw-bold small">নাম</label>
-                                <input type="text" name="name" class="form-control" placeholder="যেমন: করিম রিসেলার">
+                                <input type="text" name="name" class="form-control" placeholder="যেমন: টেস্ট কাস্টমার">
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label fw-bold small">নোট</label>

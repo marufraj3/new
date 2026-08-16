@@ -254,10 +254,19 @@
                             <div class="row">
                                 <div class="col-md-4 border-end">
                                     <h6 class="text-uppercase text-muted font-size-12">Shipping Address</h6>
-                                    <p class="mb-0 text-dark">
-                                        <i class="fe-map-pin me-1 text-primary"></i> 
+                                    <p class="mb-2 text-dark">
+                                        <i class="fe-map-pin me-1 text-primary"></i>
                                         {{ $order->address ?? 'No address provided' }}
                                     </p>
+                                    @if($hasCaptureMetadata ?? false)
+                                        <div class="small text-muted lh-lg">
+                                            <div><i class="fe-monitor me-1"></i> {{ ucfirst($order->device_type ?: 'unknown') }}{{ $order->device_name ? ' — '.$order->device_name : '' }}</div>
+                                            <div><i class="fe-globe me-1"></i> IP: {{ $order->ip_address ?: '—' }}</div>
+                                            <div><i class="fe-clock me-1"></i> Checkout started: {{ optional($order->checkout_started_at)->format('d M Y, h:i A') ?: optional($order->created_at)->format('d M Y, h:i A') }}</div>
+                                            @if($order->last_activity_at)<div><i class="fe-activity me-1"></i> Last activity: {{ $order->last_activity_at->diffForHumans() }}</div>@endif
+                                            @if($order->source)<div><i class="fe-link me-1"></i> Source: {{ $order->source }}</div>@endif
+                                        </div>
+                                    @endif
                                 </div>
 
                                 <div class="col-md-8 ps-md-4">

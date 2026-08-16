@@ -899,16 +899,10 @@ class OrderController extends Controller
             // Credit vendors for their items
             $this->distributeVendorEarnings($order);
             
-            // Credit reseller wallet if this is a reseller order
-            $this->creditResellerWallet($order);
         }
 
         // Handle stock change
         $this->handleStockChange($order, $oldStatus, $newStatus);
-
-        if ($newStatus == 11) {
-            \App\Helpers\ResellerOrderHelper::deductDeliveryChargeOnCancel($order);
-        }
 
         \Log::info('Order status manually updated', [
             'order_id' => $order->id,
@@ -950,18 +944,12 @@ class OrderController extends Controller
             // Credit vendors for their items
             $this->distributeVendorEarnings($order);
             
-            // Credit reseller wallet if this is a reseller order
-            $this->creditResellerWallet($order);
         }
 
         $order->save();
 
         // স্টক হ্যান্ডেল
         $this->handleStockChange($order, $oldStatus, $newStatus);
-
-        if ($newStatus == 11) {
-            \App\Helpers\ResellerOrderHelper::deductDeliveryChargeOnCancel($order);
-        }
 
         $shipping_update = Shipping::where('order_id', $order->id)->first();
         $shippingfee     = ShippingCharge::find($request->area);
@@ -984,7 +972,7 @@ class OrderController extends Controller
         if ($newStatus == 5 && $oldStatus != 5) {
             $courier_info = Courierapi::where(['status' => 1, 'type' => 'steadfast'])->first();
             if ($courier_info) {
-                // For reseller orders: use customer_payable_amount (reseller selling price + shipping)
+                // Preserve historical customer-payable totals when present.
                 // For normal orders: use amount (main price + shipping)
                 $codAmount = !empty($order->customer_payable_amount) 
                     ? $order->customer_payable_amount 
@@ -1175,17 +1163,10 @@ class OrderController extends Controller
 
                 // Credit vendors for their items
                 $this->distributeVendorEarnings($order);
-                
-                // Credit reseller wallet if this is a reseller order
-                $this->creditResellerWallet($order);
             }
 
             // স্টক হ্যান্ডেল
             $this->handleStockChange($order, $oldStatus, $targetStatus);
-
-            if ($targetStatus == 11) {
-                \App\Helpers\ResellerOrderHelper::deductDeliveryChargeOnCancel($order);
-            }
 
             // ✅ Use eager loaded customer instead of find()
             if ($sms_gateway && $order->customer) {
@@ -1345,7 +1326,7 @@ class OrderController extends Controller
                         continue;
                     }
                     
-                    // For reseller orders: use customer_payable_amount (reseller selling price + shipping)
+                    // Preserve historical customer-payable totals when present.
                     // For normal orders: use amount (main price + shipping)
                     $codAmount = !empty($order->customer_payable_amount) 
                         ? $order->customer_payable_amount 
@@ -1432,7 +1413,7 @@ class OrderController extends Controller
                 }
                 
                 // For other couriers (Steadfast, etc.)
-                // For reseller orders: use customer_payable_amount (reseller selling price + shipping)
+                // Preserve historical customer-payable totals when present.
                 // For normal orders: use amount (main price + shipping)
                 $codAmount = !empty($order->customer_payable_amount) 
                     ? $order->customer_payable_amount 
@@ -2457,72 +2438,4 @@ class OrderController extends Controller
         }
     }
 
-    /**
-     * Credit reseller wallet when order is delivered.
-     * Only credits if order has reseller_profit and hasn't been credited before.
-     */
-    private function creditResellerWallet(Order $order): void
-    {
-        // Check if this is a reseller order
-        if (!$order->reseller_profit || $order->reseller_profit <= 0) {
-            return;
-        }
-
-        // Get reseller user from order
-        // First check user_id (if reseller placed order directly)
-        $resellerUser = null;
-        if ($order->user_id) {
-            $resellerUser = User::find($order->user_id);
-            // Verify it's a reseller
-            if ($resellerUser && 
-                ($resellerUser->hasRole('reseller') || 
-                 (isset($resellerUser->role) && strtolower($resellerUser->role) === 'reseller'))) {
-                // Reseller found via user_id
-            } else {
-                $resellerUser = null;
-            }
-        }
-
-        // Fallback: Check customer email (for old orders)
-        if (!$resellerUser && $order->customer && $order->customer->email) {
-            $resellerUser = User::where('email', $order->customer->email)
-                ->where(function($query) {
-                    $query->where('role', 'reseller')
-                          ->orWhereHas('roles', function($q) {
-                              $q->where('name', 'reseller');
-                          });
-                })
-                ->first();
-        }
-
-        if (!$resellerUser) {
-            return;
-        }
-
-        // Check if already credited (to avoid double credit)
-        if ($order->reseller_wallet_credited) {
-            return;
-        }
-
-        $resellerProfit = (float) $order->reseller_profit;
-        
-        if ($resellerProfit > 0) {
-            // Update reseller wallet balance
-            $resellerUser->wallet_balance = (isset($resellerUser->wallet_balance) ? $resellerUser->wallet_balance : 0) + $resellerProfit;
-            $resellerUser->save();
-
-            \App\Models\ResellerWalletTransaction::log(
-                $resellerUser->id, 'order_profit', $resellerProfit,
-                'Order', $order->id,
-                'অর্ডার #' . ($order->invoice_id ?? $order->id) . ' প্রফিট'
-            );
-
-            // Mark order as credited to avoid double credit
-            $order->reseller_wallet_credited = true;
-            $order->save();
-
-            // Optional: Log the transaction (if you have a reseller wallet transaction table)
-            // You can create a similar table like VendorWalletTransaction for resellers
-        }
-    }
 }

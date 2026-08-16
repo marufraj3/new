@@ -70,7 +70,11 @@ class IncompleteOrderController extends Controller
             ? round(($stats['recovered'] / $settled) * 100, 1)
             : 0.0;
 
-        return view('backEnd.incomplete_orders.index', compact('orders', 'stats', 'status', 'search', 'hasRecovery'));
+        $hasCaptureMetadata = Schema::hasColumn('incomplete_orders', 'device_type');
+
+        return view('backEnd.incomplete_orders.index', compact(
+            'orders', 'stats', 'status', 'search', 'hasRecovery', 'hasCaptureMetadata'
+        ));
     }
 
     /**
