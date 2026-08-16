@@ -19,3 +19,6 @@ yarn-error.log
 
 # Static design preview build output
 preview/www/
+
+# Generated landing-page design preview (rendered from resources/templates/ai-studio-landing.html)
+/ai-studio-design-preview.html

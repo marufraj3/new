@@ -30,16 +30,26 @@ class CampaignCustomPageService
         $html = str_replace("\0", '', $html);
         $html = preg_replace('/<\?(?:php|=)?[\s\S]*?\?>/i', '', $html) ?? '';
 
+        // Park external resources (stylesheets, fonts, CDN scripts) before the body is
+        // extracted — they usually live in <head> and would otherwise be lost. They are
+        // re-attached at the top of the returned markup so the design loads as authored.
+        $resources = [];
+        $html = preg_replace_callback('#<link\b[^>]*>|<script\b[^>]*\bsrc\s*=[^>]*>[\s\S]*?</script\s*>#i', function (array $match) use (&$resources): string {
+            return $this->maskResource($match[0], $resources);
+        }, $html) ?? '';
+
         // A complete uploaded document is accepted; only its body belongs inside the storefront shell.
         if (preg_match('#<body\b[^>]*>([\s\S]*?)</body\s*>#i', $html, $body)) {
             $html = $body[1];
         }
 
-        // CSS and JavaScript have dedicated editors. Removing inline tags also prevents
-        // an uploaded </script> sequence from escaping the storefront shell.
+        // Structural tags are removed; they belong to the storefront shell. Inline
+        // <style>/<script> content has already been extracted into the CSS/JavaScript
+        // drafts by prepareSource()/splitHtmlUpload(), so removing the empty wrappers
+        // never drops authored code.
+        $html = preg_replace('#</?(?:html|head|body|title|meta|base)\b[^>]*>#i', '', $html) ?? '';
         $html = preg_replace('#<script\b[^>]*>[\s\S]*?</script\s*>#i', '', $html) ?? '';
         $html = preg_replace('#<style\b[^>]*>[\s\S]*?</style\s*>#i', '', $html) ?? '';
-        $html = preg_replace('#</?(?:html|head|body|title|meta|base|link)\b[^>]*>#i', '', $html) ?? '';
 
         // Keep only documented {{ variables }}. Unknown Blade expressions and all
         // directives are removed rather than evaluated.
@@ -61,7 +71,80 @@ class CampaignCustomPageService
             $html = strtr($html, $preserved);
         }
 
+        // Restore resources that lived inside the body in place; resources that lived in
+        // <head> (dropped by the body extraction) are re-attached at the very top so
+        // CDN stylesheets/scripts load before the content they style.
+        if ($resources !== []) {
+            $inBody = [];
+            $inHead = [];
+            foreach ($resources as $index => $resource) {
+                $key = '___CPB_RESOURCE_' . $index . '___';
+                if (str_contains($html, $key)) {
+                    $inBody[$key] = $resource;
+                } else {
+                    $inHead[] = $resource;
+                }
+            }
+            if ($inBody !== []) {
+                $html = strtr($html, $inBody);
+            }
+            if ($inHead !== []) {
+                $html = implode("\n", $inHead) . "\n" . $html;
+            }
+        }
+
         return trim($html) === '' ? null : trim($html);
+    }
+
+    /**
+     * Safely park an external resource tag while the rest of the markup is processed,
+     * then restore it verbatim at the end. Prevents a <link>/<script src> tag from
+     * being swallowed by the structural/Blade clean-up below.
+     */
+    private function maskResource(string $resource, array &$resources): string
+    {
+        $index = count($resources);
+        $resources[] = $resource;
+        return '___CPB_RESOURCE_' . $index . '___';
+    }
+
+    /**
+     * Turn a raw source blob (a full HTML document pasted into the HTML editor or an
+     * uploaded file) into the three builder drafts without losing any authored code:
+     * inline <style> is merged into the CSS draft, inline <script> into the JS draft,
+     * and external <link>/<script src> resources stay inside the HTML.
+     *
+     * @param  string|null  $html
+     * @param  string|null  $css
+     * @param  string|null  $js
+     * @return array{html:?string,css:?string,js:?string}
+     */
+    public function prepareSource(?string $html, ?string $css = null, ?string $js = null): array
+    {
+        $html = (string) ($html ?? '');
+        $extractedCss = [];
+        $extractedJs = [];
+
+        // Pull inline styles out of the markup so nothing typed in the HTML editor is lost.
+        $html = preg_replace_callback('#<style\b[^>]*>([\s\S]*?)</style\s*>#i', function (array $match) use (&$extractedCss): string {
+            $extractedCss[] = trim($match[1]);
+            return '';
+        }, $html) ?? $html;
+
+        // Pull inline scripts out; external <script src> (CDN libraries) stays in place.
+        $html = preg_replace_callback('#<script\b(?![^>]*\bsrc\s*=)[^>]*>([\s\S]*?)</script\s*>#i', function (array $match) use (&$extractedJs): string {
+            $extractedJs[] = trim($match[1]);
+            return '';
+        }, $html) ?? $html;
+
+        $cssParts = array_values(array_filter(array_map('trim', array_merge($extractedCss, [(string) ($css ?? '')]))));
+        $jsParts = array_values(array_filter(array_map('trim', array_merge($extractedJs, [(string) ($js ?? '')]))));
+
+        return [
+            'html' => $this->cleanHtml($html),
+            'css' => $this->cleanCss(implode("\n\n", $cssParts)),
+            'js' => $this->cleanJs(implode("\n\n", $jsParts)),
+        ];
     }
 
     public function cleanCss(?string $css): ?string
@@ -99,21 +182,32 @@ class CampaignCustomPageService
 
     /**
      * Split a complete HTML upload into the three builder editors.
-     * External script/style URLs are deliberately not imported; self-contained source
-     * remains fast and avoids giving third parties control of checkout pages.
      *
      * @return array{html:?string,css:?string,js:?string}
      */
     public function splitHtmlUpload(string $source): array
     {
-        preg_match_all('#<style\b[^>]*>([\s\S]*?)</style\s*>#i', $source, $styles);
-        preg_match_all('#<script\b(?![^>]*\bsrc\s*=)[^>]*>([\s\S]*?)</script\s*>#i', $source, $scripts);
+        return $this->prepareSource($source);
+    }
 
-        return [
-            'html' => $this->cleanHtml($source),
-            'css' => $this->cleanCss(implode("\n\n", $styles[1] ?? [])),
-            'js' => $this->cleanJs(implode("\n\n", $scripts[1] ?? [])),
-        ];
+    /**
+     * The built-in "AI Studio" conversion landing page (Tailwind + Font Awesome),
+     * shipped as a ready-to-edit starting point. Its product names, prices, images,
+     * product selector and checkout are dynamic, so everything stays controllable
+     * from the admin panel while the visual design matches the provided reference.
+     *
+     * @return array{html:?string,css:?string,js:?string}
+     */
+    public function studioTemplate(): array
+    {
+        $path = base_path('resources/templates/ai-studio-landing.html');
+        $source = is_file($path) ? (string) file_get_contents($path) : '';
+
+        if (trim($source) === '') {
+            return ['html' => null, 'css' => null, 'js' => null];
+        }
+
+        return $this->splitHtmlUpload($source);
     }
 
     public function render(?string $html, Campaign $campaign, Collection $products): string

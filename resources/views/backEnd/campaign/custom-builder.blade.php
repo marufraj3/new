@@ -38,6 +38,7 @@
             @if($campaign->is_published)
                 <a href="{{ route('campaign', $campaign->slug) }}" target="_blank" class="btn btn-outline-primary"><i class="fe-external-link me-1"></i> View live</a>
             @endif
+            <form action="{{ route('campaign.custom-builder.template', $campaign->id) }}" method="POST" onsubmit="return confirm('AI Studio ডিজাইন লোড করলে বর্তমান draft editors প্রতিস্থাপিত হবে। চালিয়ে যাবেন?');">@csrf<button class="btn btn-dark"><i class="fe-layout me-1"></i> AI Studio ডিজাইন লোড করুন</button></form>
             <form action="{{ route('campaign.custom-builder.publish', $campaign->id) }}" method="POST" onsubmit="return confirm('Publish the currently saved draft?');">@csrf<button class="btn btn-success"><i class="fe-upload-cloud me-1"></i> Publish saved draft</button></form>
             @if($campaign->is_published)
                 <form action="{{ route('campaign.unpublish', $campaign->id) }}" method="POST" onsubmit="return confirm('Unpublish this landing page? Drafts and data will be kept.');">@csrf<button class="btn btn-outline-danger"><i class="fe-eye-off me-1"></i> Unpublish</button></form>
@@ -76,7 +77,7 @@
                         <button class="cb-token" type="button" data-token="&#123;&#123; {{ $token }} &#125;&#125;">&#123;&#123; {{ $token }} &#125;&#125;</button>
                     @endforeach
                 </div>
-                <div class="cb-help">HTML uploads may be complete documents. Inline &lt;style&gt; and inline &lt;script&gt; blocks are automatically moved into the CSS and JavaScript drafts. External CDN scripts are not imported. If product or checkout placeholders are omitted, the live Laravel components are appended automatically.</div>
+                <div class="cb-help">আপনি সম্পূর্ণ HTML ডকুমেন্ট পেস্ট করতে পারবেন। Inline &lt;style&gt; ও inline &lt;script&gt; ব্লক স্বয়ংক্রিয়ভাবে CSS ও JavaScript draft-এ চলে যায় — কোনো কোড হারায় না। &lt;link&gt;, &lt;meta&gt; ও CDN &lt;script src&gt; (Tailwind, Font Awesome ইত্যাদি) HTML-এ থেকে যায়। Product/checkout placeholder না থাকলে লাইভ Laravel কম্পোনেন্ট স্বয়ংক্রিয়ভাবে যোগ হয়।</div>
                 <div class="cb-savebar"><span class="cb-save-state" id="cb-save-state">Draft changes are local until saved.</span><button class="btn btn-primary px-4" type="submit"><i class="fe-save me-1"></i> Save draft</button></div>
             </form>
         </section>

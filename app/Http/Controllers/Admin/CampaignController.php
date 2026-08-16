@@ -126,6 +126,31 @@ class CampaignController extends Controller
         return redirect()->route('campaign.custom-builder', $campaign->id);
     }
 
+    /**
+     * Load the built-in "AI Studio" conversion design into the draft editors so it can
+     * be previewed, edited and published. Product names, prices, images, the product
+     * selector and the checkout stay dynamic (admin-controlled).
+     */
+    public function loadStudioTemplate($id, CampaignCustomPageService $service)
+    {
+        $campaign = Campaign::findOrFail($id);
+        $template = $service->studioTemplate();
+
+        if (blank($template['html'] ?? null)) {
+            Toastr::error('The AI Studio template is unavailable.', 'Error');
+            return redirect()->route('campaign.custom-builder', $campaign->id);
+        }
+
+        $campaign->forceFill([
+            'custom_html_draft' => $template['html'],
+            'custom_css_draft' => $template['css'],
+            'custom_js_draft' => $template['js'],
+        ])->save();
+
+        Toastr::success('AI Studio ডিজাইন লোড হয়েছে। প্রিভিউ দেখে Publish saved draft চাপুন।', 'Success');
+        return redirect()->route('campaign.custom-builder', $campaign->id);
+    }
+
     public function uploadCustomSource(Request $request, $id, CampaignCustomPageService $service)
     {
         $campaign = Campaign::findOrFail($id);
@@ -212,11 +237,13 @@ class CampaignController extends Controller
             'custom_js' => ['nullable', 'string', 'max:1048576'],
         ]);
 
-        return [
-            'html' => $service->cleanHtml($validated['custom_html'] ?? null),
-            'css' => $service->cleanCss($validated['custom_css'] ?? null),
-            'js' => $service->cleanJs($validated['custom_js'] ?? null),
-        ];
+        // Inline <style>/<script> pasted into the HTML editor are merged into the CSS/JS
+        // drafts instead of being silently dropped, so a full HTML document saves completely.
+        return $service->prepareSource(
+            $validated['custom_html'] ?? null,
+            $validated['custom_css'] ?? null,
+            $validated['custom_js'] ?? null
+        );
     }
 
     private function assertCodeExtension(string $extension, array $allowed, string $label): void

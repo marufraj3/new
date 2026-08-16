@@ -936,6 +936,7 @@ Route::get('dashboard', [DashboardController::class, 'dashboard'])->name('admin.
     Route::delete('campaign/{id}/builder', [CampaignController::class,'clearBuilder'])->name('campaign.builder.clear');
     Route::get('campaign/{id}/custom-builder', [CampaignController::class,'customBuilder'])->name('campaign.custom-builder');
     Route::post('campaign/{id}/custom-builder/draft', [CampaignController::class,'saveCustomDraft'])->name('campaign.custom-builder.draft');
+    Route::post('campaign/{id}/custom-builder/template', [CampaignController::class,'loadStudioTemplate'])->name('campaign.custom-builder.template');
     Route::post('campaign/{id}/custom-builder/upload', [CampaignController::class,'uploadCustomSource'])->name('campaign.custom-builder.upload');
     Route::post('campaign/{id}/custom-builder/publish', [CampaignController::class,'publishCustom'])->name('campaign.custom-builder.publish');
     Route::post('campaign/{id}/unpublish', [CampaignController::class,'unpublish'])->name('campaign.unpublish');
