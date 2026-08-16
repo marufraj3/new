@@ -20,7 +20,16 @@ class GeminiService
     {
         $this->setting = $setting ?? GeminiSetting::current();
         $this->apiKey = $this->setting->api_key ?: config('gemini.api_key');
-        $this->model = $this->setting->model ?: config('gemini.model', 'gemini-1.5-flash');
+        $this->model = $this->setting->model ?: config('gemini.model', 'gemini-2.5-flash');
+
+        // Google retired the 1.5 series on the v1beta API ("not found" errors).
+        // If the stored model is deprecated/unknown, auto-fall back to the default.
+        $availableModels = array_keys(config('gemini.models', []));
+        if ($availableModels && !in_array($this->model, $availableModels, true)) {
+            Log::warning('Gemini: model "' . $this->model . '" is not available, falling back to "' . config('gemini.model', 'gemini-2.5-flash') . '"');
+            $this->model = config('gemini.model', 'gemini-2.5-flash');
+        }
+
         $this->baseUrl = config('gemini.base_url', 'https://generativelanguage.googleapis.com/v1beta');
     }
 

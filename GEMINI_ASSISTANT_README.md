@@ -32,7 +32,7 @@ This feature adds a powerful AI assistant powered by Google Gemini to your e-com
 - **Route**: `/admin/gemini-ai/settings`
 - Configure:
   - API Key (from Google AI Studio)
-  - Model (gemini-1.5-flash, gemini-1.5-pro, gemini-1.0-pro, gemini-2.0-flash-exp)
+  - Model (gemini-2.5-flash, gemini-2.5-pro)
   - Temperature, Max Tokens
   - System Prompt (customizable)
   - Language preference
@@ -71,7 +71,7 @@ Run: `php artisan migrate`
 ### .env
 ```env
 GEMINI_API_KEY=AIzaSy...
-GEMINI_MODEL=gemini-1.5-flash
+GEMINI_MODEL=gemini-2.5-flash
 GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta
 ```
 
@@ -123,7 +123,7 @@ Route::prefix('admin')->middleware(['auth:admin', 'admin'])->name('admin.')->gro
 4. Test connection
 5. Start chatting in Bangla or English
 
-Free tier limits (Gemini 1.5 Flash):
+Free tier limits (Gemini 2.5 Flash):
 - 15 RPM, 1M tokens/min, 1500 RPD - very generous
 
 ## 💡 Example Questions to Ask

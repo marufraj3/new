@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('gemini_settings', function (Blueprint $table) {
             $table->id();
             $table->string('api_key')->nullable();
-            $table->string('model')->default('gemini-1.5-flash');
+            $table->string('model')->default('gemini-2.5-flash');
             $table->boolean('status')->default(true)->comment('1=active, 0=inactive');
             $table->text('system_prompt')->nullable();
             $table->decimal('temperature', 3, 2)->default(0.70);

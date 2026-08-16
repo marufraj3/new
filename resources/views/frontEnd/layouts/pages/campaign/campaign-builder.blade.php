@@ -248,11 +248,6 @@
         </div>
     </template>
 
-    {{-- ===== Visual design ON/OFF toggle ===== --}}
-    <button id="cpb-design-toggle" class="cpb-design-toggle" type="button" aria-pressed="true" title="বিল্ডার ডিজাইন দেখান/লুকান">
-        <span aria-hidden="true">🎨</span><span data-design-toggle-label>ডিজাইন লুকান</span>
-    </button>
-
     <div id="cpb-store-loading" class="cpb-store-loading" hidden><span></span><strong>আপনার অর্ডার আপডেট হচ্ছে...</strong></div>
     <button id="cpb-sticky-order" class="cpb-sticky-order" type="button" hidden><span aria-hidden="true">🛍️</span><span>এখনই অর্ডার করুন</span></button>
     <div id="cpb-store-toast" class="cpb-store-toast" role="status" aria-live="polite"></div>

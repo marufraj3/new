@@ -574,76 +574,6 @@
     }
 
     /* ============================================================
-       Visual design ON/OFF toggle
-       বাটনে ক্লিক করলে builder-এর কাস্টম page_html/CSS ডিজাইন hide হয়ে
-       শুধু প্রোডাক্ট + রিভিউ + চেকআউট (plain) দেখায়; আবার ক্লিক করলে ফিরে আসে।
-       ============================================================ */
-    function initDesignToggle() {
-        const button = document.getElementById('cpb-design-toggle');
-        if (!button) return;
-        const label = button.querySelector('[data-design-toggle-label]');
-        const storageKey = 'cpb-design-hidden-' + (campaign.id || 'campaign');
-        const plainView = document.createElement('div');
-        plainView.id = 'cpb-plain-view';
-        plainView.hidden = true;
-        root.appendChild(plainView);
-
-        const blocks = [
-            { node: root.querySelector('[data-cpb-dynamic="products"]'), heading: 'আমাদের পণ্যসমূহ' },
-            { node: root.querySelector('[data-cpb-dynamic="reviews"]'), heading: 'কাস্টমার রিভিউ' },
-            { node: root.querySelector('#order_form'), heading: 'অর্ডার করতে নিচের ফর্মটি পূরণ করুন' }
-        ].filter(block => block.node);
-
-        let designHidden = false;
-
-        function moveToPlain() {
-            blocks.forEach(block => {
-                block.parent = block.node.parentNode;
-                block.next = block.node.nextSibling;
-                const wrapper = document.createElement('section');
-                wrapper.className = 'cpb-plain-block';
-                const title = document.createElement('h2');
-                title.className = 'cpb-plain-heading';
-                title.textContent = block.heading;
-                wrapper.appendChild(title);
-                wrapper.appendChild(block.node);
-                plainView.appendChild(wrapper);
-                block.wrapper = wrapper;
-            });
-        }
-
-        function restoreFromPlain() {
-            blocks.slice().reverse().forEach(block => {
-                if (!block.parent) return;
-                block.parent.insertBefore(block.node, block.next);
-                block.wrapper?.remove();
-                block.wrapper = null;
-            });
-            plainView.replaceChildren();
-        }
-
-        function apply(hidden, persist) {
-            if (hidden === designHidden) return;
-            designHidden = hidden;
-            if (hidden) { moveToPlain(); } else { restoreFromPlain(); }
-            plainView.hidden = !hidden;
-            root.classList.toggle('cpb-design-hidden', hidden);
-            button.setAttribute('aria-pressed', hidden ? 'false' : 'true');
-            if (label) label.textContent = hidden ? 'ডিজাইন দেখান' : 'ডিজাইন লুকান';
-            button.title = hidden ? 'বিল্ডার ডিজাইন আবার দেখান' : 'বিল্ডার ডিজাইন লুকান';
-            if (persist) {
-                try { window.sessionStorage.setItem(storageKey, hidden ? '1' : '0'); } catch (_) {}
-            }
-        }
-
-        button.addEventListener('click', () => apply(!designHidden, true));
-
-        let stored = null;
-        try { stored = window.sessionStorage.getItem(storageKey); } catch (_) {}
-        if (stored === '1') apply(true, false);
-    }
-
-    /* ============================================================
        Abandoned cart capture (ইনকমপ্লিট অর্ডার)
        ক্যাম্পেইন ল্যান্ডিং পেজই সবচেয়ে বেশি ট্রাফিক পায়, অথচ এতদিন এখান থেকে
        কোনো লিড সেভ হতো না। কাস্টমার নাম/ফোন/ঠিকানা লিখলে (অর্ডার সাবমিট না
@@ -976,7 +906,6 @@
 
     mountDynamicContent();
     bindEvents();
-    initDesignToggle();
     initAbandonedCart();
     initCoupon();
     initOrderBumps();
