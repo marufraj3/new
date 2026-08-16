@@ -68,7 +68,7 @@ class FrontendController extends Controller
     public function index()
     {
         // ✅ Homepage cache (5 min) - reduces DB load on high traffic
-        $cacheKey = 'frontend_homepage_v3';
+        $cacheKey = 'frontend_homepage_v4';
         $data = Cache::remember($cacheKey, 300, function () {
             return $this->getHomepageData();
         });

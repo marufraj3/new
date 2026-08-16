@@ -56,6 +56,20 @@
 .side-deal .side-link{color:#4ade80}
 .side-support .side-link{color:var(--accent,#e53e3e)}
 
+/* Side card image background + overlay */
+.side-card{position:relative;overflow:hidden}
+.side-card__bg{position:absolute;inset:0;background-size:cover;background-position:center;background-repeat:no-repeat;transition:transform .4s ease;z-index:0}
+.side-card:hover .side-card__bg{transform:scale(1.04)}
+.side-card__shade{position:absolute;inset:0;background:linear-gradient(135deg,rgba(26,26,46,.85) 0%,rgba(22,33,62,.72) 60%,rgba(22,33,62,.45) 100%);z-index:1}
+.side-card__shade--light{background:linear-gradient(135deg,rgba(255,255,255,.92) 0%,rgba(255,255,255,.7) 60%,rgba(255,255,255,.4) 100%)}
+.side-card__deco{position:absolute;right:-20px;top:-20px;font-size:140px;opacity:.08;z-index:0;pointer-events:none}
+.side-deal .side-card__deco{color:#fff}
+.side-support .side-card__deco{color:var(--accent,#e53e3e)}
+.side-card__body{position:relative;z-index:2}
+.side-deal.side-card{padding-left:22px;padding-right:22px}
+.side-support.side-card.with-bg{background:transparent;border-color:transparent}
+.side-card.with-bg{border:0}
+
 /* ========================================
    TRUST STRIP
    ======================================== */
@@ -231,18 +245,36 @@
                     @endif
                 </div>
 
-                {{-- Side Cards --}}
+                {{-- Side Cards (Slider Bottom Ads — controllable from admin) --}}
+                @php
+                    $dealAd  = isset($sliderbottomads) && $sliderbottomads->count() > 0 ? $sliderbottomads->get(0) : null;
+                    $helpAd  = isset($sliderbottomads) && $sliderbottomads->count() > 1 ? $sliderbottomads->get(1) : null;
+                    $dealHref = optional($dealAd)->link ?: route('hotdeals');
+                    $helpHref = optional($helpAd)->link ?: (optional($contact)->hotline ? 'tel:'.optional($contact)->hotline : route('contact'));
+                @endphp
                 <div class="hero-side">
-                    <a class="side-card side-deal" href="{{ route('hotdeals') }}">
-                        <div>
+                    <a class="side-card side-deal" href="{{ $dealHref }}" aria-label="Hot Deals">
+                        @if($dealAd && $dealAd->image)
+                            <div class="side-card__bg" style="background-image:url('{{ asset($dealAd->image) }}')"></div>
+                            <div class="side-card__shade"></div>
+                        @else
+                            <div class="side-card__deco"><i class="fa-solid fa-fire"></i></div>
+                        @endif
+                        <div class="side-card__body">
                             <span class="side-tag"><i class="fa-solid fa-fire"></i> HOT DEALS</span>
                             <h3>আজকের সেরা ডিল</h3>
                             <p>বিশেষ দামে নির্বাচিত পণ্য কিনুন, স্টক থাকা পর্যন্ত।</p>
                             <span class="side-link">Shop Now <i class="fa-solid fa-arrow-right"></i></span>
                         </div>
                     </a>
-                    <a class="side-card side-support" href="tel:{{ optional($contact)->hotline }}">
-                        <div>
+                    <a class="side-card side-support" href="{{ $helpHref }}" aria-label="Customer Support">
+                        @if($helpAd && $helpAd->image)
+                            <div class="side-card__bg" style="background-image:url('{{ asset($helpAd->image) }}')"></div>
+                            <div class="side-card__shade side-card__shade--light"></div>
+                        @else
+                            <div class="side-card__deco"><i class="fa-solid fa-headset"></i></div>
+                        @endif
+                        <div class="side-card__body">
                             <span class="side-tag"><i class="fa-solid fa-headset"></i> SUPPORT</span>
                             <h3>অর্ডারে সাহায্য লাগবে?</h3>
                             <p>আমাদের team আপনাকে সাহায্য করবে।</p>
@@ -320,16 +352,37 @@
         </section>
         @endif
 
-        {{-- ===== 6. AD BANNER ===== --}}
-        @if(count($sliderbottomads) > 0)
+        {{-- ===== 6. AD BANNER (Slider Bottom — third entry if available, else none) ===== --}}
         @php
-            $ad = $sliderbottomads->first();
+            $bottomAd = isset($sliderbottomads) && $sliderbottomads->count() > 2 ? $sliderbottomads->get(2) : null;
+            if (!$bottomAd && isset($campaognads) && $campaognads->count() > 0) {
+                $bottomAd = $campaognads->first();
+            }
         @endphp
+        @if($bottomAd && $bottomAd->image)
         <section class="home-section reveal">
-            <a href="{{ $ad->link ?? '#' }}" class="ad-banner">
-                <img loading="lazy" src="{{ asset($ad->image) }}" alt="বিশেষ অফার">
+            <a href="{{ $bottomAd->link ?? '#' }}" class="ad-banner">
+                <img loading="lazy" src="{{ asset($bottomAd->image) }}" alt="বিশেষ অফার">
             </a>
         </section>
+        @endif
+
+        {{-- ===== 6b. ALL PRODUCTS (Home: Show All Products) ===== --}}
+        @if(isset($all_products) && $all_products && count($all_products) > 0)
+            <section class="home-section reveal">
+                <div class="section-heading">
+                    <div>
+                        <h2>সব পণ্য</h2>
+                        <p>আপনার জন্য বাছাই করা সব পণ্য</p>
+                    </div>
+                    <a class="section-link" href="{{ route('shop') }}">সব দেখুন <i class="fa-solid fa-arrow-right"></i></a>
+                </div>
+                <div class="product-grid">
+                    @foreach($all_products as $product)
+                        @include('frontEnd.layouts.partials.product-card', ['product' => $product])
+                    @endforeach
+                </div>
+            </section>
         @endif
 
         {{-- ===== 7. DYNAMIC HOME CATEGORY PRODUCTS ===== --}}
