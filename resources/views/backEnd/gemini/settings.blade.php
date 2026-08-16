@@ -133,10 +133,8 @@
                         <select name="model" class="gemini-form-control">
                             @php
                                 $models = config('gemini.models', [
-                                    'gemini-1.5-flash'=>'Gemini 1.5 Flash',
-                                    'gemini-1.5-pro'=>'Gemini 1.5 Pro',
-                                    'gemini-1.0-pro'=>'Gemini 1.0 Pro',
-                                    'gemini-2.0-flash-exp'=>'Gemini 2.0 Flash Exp'
+                                    'gemini-2.5-flash'=>'Gemini 2.5 Flash',
+                                    'gemini-2.5-pro'=>'Gemini 2.5 Pro',
                                 ]);
                             @endphp
                             @foreach($models as $key => $label)
@@ -213,8 +211,8 @@
                     <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a> and login with Google.</li>
                     <li>Click <b>Create API Key</b> and copy it.</li>
                     <li>Paste here and save. Then go to Assistant and ask anything in Bangla/English.</li>
-                    <li>Alternatively set <code>GEMINI_API_KEY</code> in <code>.env</code> file: <br><code>GEMINI_API_KEY=AIzaSy...</code> <br><code>GEMINI_MODEL=gemini-1.5-flash</code></li>
-                    <li>Cost: Gemini 1.5 Flash free tier অনেক generous (15 RPM, 1M tokens/min free).</li>
+                    <li>Alternatively set <code>GEMINI_API_KEY</code> in <code>.env</code> file: <br><code>GEMINI_API_KEY=AIzaSy...</code> <br><code>GEMINI_MODEL=gemini-2.5-flash</code></li>
+                    <li>Cost: Gemini 2.5 Flash is highly capable and cost-effective for production use.</li>
                 </ol>
 
                 <h6 style="font-weight:700;margin-top:16px;color:#111827;">💡 Quick Ideas What You Can Ask:</h6>

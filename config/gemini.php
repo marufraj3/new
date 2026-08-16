@@ -7,7 +7,7 @@ return [
     |--------------------------------------------------------------------------
     */
     'api_key' => env('GEMINI_API_KEY', ''),
-    'model' => env('GEMINI_MODEL', 'gemini-1.5-flash'),
+    'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
     'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
 
     /*
@@ -16,10 +16,8 @@ return [
     |--------------------------------------------------------------------------
     */
     'models' => [
-        'gemini-1.5-flash' => 'Gemini 1.5 Flash (Fast & Cost Effective)',
-        'gemini-1.5-pro' => 'Gemini 1.5 Pro (High Quality)',
-        'gemini-1.0-pro' => 'Gemini 1.0 Pro (Legacy)',
-        'gemini-2.0-flash-exp' => 'Gemini 2.0 Flash Experimental',
+        'gemini-2.5-flash' => 'Gemini 2.5 Flash (Fast & Cost Effective)',
+        'gemini-2.5-pro' => 'Gemini 2.5 Pro (High Quality)',
     ],
 
     /*
